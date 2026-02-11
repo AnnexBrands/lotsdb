@@ -1,18 +1,20 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: template → 1.0.0
-  Modified principles: N/A (initial ratification)
+  Version change: 1.0.0 → 1.1.0 (MINOR)
+  Modified principles: None
   Added sections:
-    - Core Principles (5 principles derived from Soul doctrine)
-    - Core Artifacts (first-class artifact definitions)
-    - The Flywheel (artifact reinforcement cycle)
-    - Governance
+    - PR Review Protocol (new section between The Flywheel and Governance)
   Removed sections: None
+  Rationale: Governance stated "All PRs and reviews MUST verify compliance"
+    but provided no actionable process. Reviewers had to re-derive the
+    verification steps from abstract principles each time. This amendment
+    adds a concrete, step-by-step protocol that a reviewer can follow
+    independently using only the speckit artifacts in the feature branch.
   Templates requiring updates:
-    ✅ plan-template.md — Constitution Check section is generic; no update needed
-    ✅ spec-template.md — User stories and requirements align with Contracted Boundaries; no update needed
-    ✅ tasks-template.md — Phase structure supports incremental artifact delivery; no update needed
+    ✅ plan-template.md — No update needed (protocol references specs/ artifacts generically)
+    ✅ spec-template.md — No update needed
+    ✅ tasks-template.md — No update needed
   Follow-up TODOs: None
 -->
 
@@ -103,13 +105,112 @@ reinforce each other and prevent drift:
 The flywheel is self-sustaining: each artifact strengthens the next,
 and any break in the chain surfaces as a visible failure.
 
+## PR Review Protocol
+
+Every PR that introduces or modifies a feature MUST be reviewed against
+the speckit artifacts in the feature's `specs/###-feature-name/` directory.
+A reviewer who has never seen the code should be able to complete this
+protocol using only the PR diff and the artifacts.
+
+### Step 0: Locate Artifacts
+
+Identify the feature branch name (e.g., `002-catalog-dropzone`) and
+confirm the following exist in `specs/<branch>/`:
+
+| Artifact | File | Required? |
+|----------|------|-----------|
+| Specification | `spec.md` | YES |
+| Plan | `plan.md` | YES |
+| Tasks | `tasks.md` | YES |
+| Contracts | `contracts/` | If feature has APIs/interfaces |
+| Data Model | `data-model.md` | If feature has data entities |
+| Research | `research.md` | No (informational) |
+| Quickstart | `quickstart.md` | If feature has operational steps |
+| Checklists | `checklists/` | If generated pre-implementation |
+
+**BLOCK** if spec.md, plan.md, or tasks.md are missing.
+
+### Step 1: Spec ↔ Code (Principle I + III)
+
+Walk each functional requirement (FR-xxx) in `spec.md`:
+
+- [ ] Every FR has corresponding code in the PR diff
+- [ ] No code in the PR introduces behavior not described in a FR
+- [ ] Spec status reflects current state (Draft → Implemented)
+- [ ] Acceptance scenarios are all addressable by the implementation
+
+**BLOCK** if any FR has no corresponding code, or if code introduces
+undocumented behavior.
+
+### Step 2: Contract ↔ Code (Principle III)
+
+If `contracts/` exists, for each endpoint/interface defined:
+
+- [ ] Request shape in code matches the contract schema
+- [ ] Response shape in code matches the contract schema
+- [ ] HTTP methods and status codes match
+- [ ] Error responses match the contract's error schema
+
+**BLOCK** if code deviates from a contract without a spec amendment.
+
+### Step 3: Tests ↔ Spec (Principle II)
+
+- [ ] Every acceptance scenario in spec.md has at least one test that
+      exercises it (contract test, integration test, or unit test)
+- [ ] Edge cases listed in spec.md are covered by tests
+- [ ] All tests pass (`pytest` or equivalent)
+- [ ] Tests actually assert the behavior described (not just "runs
+      without error")
+
+**BLOCK** if an acceptance scenario has zero test coverage. **WARN** if
+edge cases lack coverage.
+
+### Step 4: Docs ↔ Code (Principle V)
+
+- [ ] `quickstart.md` file paths match actual file locations in the PR
+- [ ] Manual test steps in quickstart.md are accurate for the
+      implemented behavior
+- [ ] Programmatic test commands in quickstart.md work when run
+- [ ] Any referenced URLs, endpoints, or config match reality
+
+**BLOCK** if docs reference files, paths, or behavior that don't exist.
+
+### Step 5: Tasks ↔ Completion (Principle IV)
+
+- [ ] All tasks in `tasks.md` are marked `[X]` (complete)
+- [ ] No task is left `[ ]` without explanation
+- [ ] Files listed in task descriptions exist in the PR diff
+
+**WARN** if incomplete tasks exist. **BLOCK** if core tasks are skipped.
+
+### Step 6: Cross-Artifact Consistency
+
+- [ ] Terminology is consistent across spec, contracts, code, tests,
+      and docs (same names for the same concepts)
+- [ ] Data shapes in `data-model.md` match both contracts and code
+- [ ] Plan's "Project Structure" section matches the actual files
+      changed in the PR
+
+**WARN** on terminology drift. **BLOCK** on structural contradictions.
+
+### Verdict
+
+| Result | Criteria |
+|--------|----------|
+| **APPROVE** | All steps pass with no BLOCKs and no unresolved WARNs |
+| **REQUEST CHANGES** | One or more BLOCKs, or WARNs the author cannot justify |
+| **APPROVE WITH NOTES** | No BLOCKs, WARNs exist but are acknowledged with rationale |
+
+The reviewer MUST include which steps passed and which produced findings
+in their review comment. A one-line "LGTM" does not satisfy this protocol.
+
 ## Governance
 
 - This constitution supersedes all other development practices in this
   repository. When a conflict exists, the constitution wins.
 - Amendments require: (1) documented rationale, (2) review approval,
   (3) migration plan for existing artifacts if principles change.
-- All PRs and reviews MUST verify compliance with these principles.
+- All PRs and reviews MUST follow the PR Review Protocol above.
 - Complexity MUST be justified — if a simpler approach satisfies the
   artifact harmony requirement, prefer it.
 - Constitution versioning follows semantic versioning:
@@ -117,4 +218,4 @@ and any break in the chain surfaces as a visible failure.
   - MINOR: New principle or materially expanded guidance.
   - PATCH: Clarifications, wording, non-semantic refinements.
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-10
+**Version**: 1.1.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-11

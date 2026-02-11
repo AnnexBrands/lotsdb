@@ -160,6 +160,15 @@ def bulk_insert(request, data):
     return api.bulk.insert(data)
 
 
+def find_catalog_by_customer_id(request, customer_catalog_id):
+    """Look up a catalog by its customer_catalog_id and return its internal id, or None."""
+    api = get_catalog_api(request)
+    result = api.catalogs.list(page_number=1, page_size=1, CustomerCatalogId=customer_catalog_id)
+    if result.items:
+        return result.items[0].id
+    return None
+
+
 def search_lots(request, query, page=1, page_size=25):
     """Search lots by customer item ID and lot number, combining results."""
     api = get_catalog_api(request)
