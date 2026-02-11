@@ -12,7 +12,7 @@
     <nav class="navbar">
         <a href="/" class="nav-brand">Catalog Manager</a>
         <form action="{% url 'search' %}" method="get" class="nav-search">
-            <input type="text" name="q" placeholder="Search lots..." value="{{ request.GET.q|default:'' }}">
+            <input type="text" name="q" placeholder="Search by lot # or item ID..." value="{{ request.GET.q|default:'' }}">
             <button type="submit">Search</button>
         </form>
         <form action="{% url 'logout' %}" method="post" class="nav-logout">

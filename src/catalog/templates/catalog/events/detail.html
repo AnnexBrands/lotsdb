@@ -26,16 +26,14 @@
     <thead>
         <tr>
             <th>Lot #</th>
-            <th>Item ID</th>
-            <th>Description</th>
+            <th>Lot ID</th>
         </tr>
     </thead>
     <tbody>
         {% for lot in lots %}
         <tr>
-            <td><a href="{% url 'lot_detail' lot.id %}">{{ lot.lot_number|default:lot.id }}</a></td>
-            <td>{{ lot.customer_item_id|default:"—" }}</td>
-            <td>{{ lot.initial_data.description|default:"—"|truncatewords:20 }}</td>
+            <td><a href="{% url 'lot_detail' lot.id %}">{{ lot.lot_number|default:"—" }}</a></td>
+            <td>{{ lot.id }}</td>
         </tr>
         {% endfor %}
     </tbody>

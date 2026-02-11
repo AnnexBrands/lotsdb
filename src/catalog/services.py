@@ -110,8 +110,10 @@ def get_seller(request, seller_id):
 # --- Catalog (Event) service methods ---
 
 
-def list_catalogs(request, page=1, page_size=25, **filters):
+def list_catalogs(request, page=1, page_size=25, seller_id=None, **filters):
     api = get_catalog_api(request)
+    if seller_id is not None:
+        filters["SellerIds"] = seller_id
     return api.catalogs.list(page_number=page, page_size=page_size, **filters)
 
 
@@ -153,7 +155,20 @@ def save_lot_override(request, lot_id, override_data):
 
 
 def search_lots(request, query, page=1, page_size=25):
+    """Search lots by customer item ID and lot number, combining results."""
     api = get_catalog_api(request)
-    return api.lots.list(
-        page_number=page, page_size=page_size, CustomerItemId=query
-    )
+
+    by_item = api.lots.list(page_number=page, page_size=page_size, CustomerItemId=query)
+    by_lot_num = api.lots.list(page_number=page, page_size=page_size, LotNumber=query)
+
+    # Merge and deduplicate by lot id
+    seen = set()
+    merged = []
+    for lot in list(by_item.items) + list(by_lot_num.items):
+        if lot.id not in seen:
+            seen.add(lot.id)
+            merged.append(lot)
+
+    by_item.items = merged
+    by_item.total_items = len(merged)
+    return by_item

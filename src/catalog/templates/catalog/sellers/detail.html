@@ -17,6 +17,8 @@
 
 <h2>Events</h2>
 
+{% include "catalog/partials/filters.html" %}
+
 {% if events %}
 <table>
     <thead>
@@ -42,6 +44,9 @@
         {% endfor %}
     </tbody>
 </table>
+
+{% include "catalog/partials/pagination.html" %}
+
 {% else %}
 <div class="empty-state">This seller has no events.</div>
 {% endif %}

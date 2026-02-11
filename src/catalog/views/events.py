@@ -9,19 +9,30 @@ def event_detail(request, event_id):
 
     event = services.get_catalog(request, event_id)
 
-    lots_result = None
-    if event.customer_catalog_id:
-        lots_result = services.list_lots_by_catalog(
-            request, customer_catalog_id=event.customer_catalog_id, page=page, page_size=page_size
-        )
+    # CatalogExpandedDto includes lots (LotCatalogInformationDto: id + lot_number).
+    # The Lot list API does not support CustomerCatalogId filtering, so we use
+    # the embedded lots from the catalog response and paginate locally.
+    all_lots = event.lots or []
+    total = len(all_lots)
+    start = (page - 1) * page_size
+    page_lots = all_lots[start : start + page_size]
+    total_pages = max(1, (total + page_size - 1) // page_size)
+
+    paginated = {
+        "page_number": page,
+        "total_pages": total_pages,
+        "total_items": total,
+        "has_previous_page": page > 1,
+        "has_next_page": page < total_pages,
+    }
 
     # Find seller context for breadcrumbs
     seller = event.sellers[0] if event.sellers else None
 
     return render(request, "catalog/events/detail.html", {
         "event": event,
-        "lots": lots_result.items if lots_result else [],
-        "paginated": lots_result,
+        "lots": page_lots,
+        "paginated": paginated,
         "seller": seller,
         "preserved_params": {},
     })
