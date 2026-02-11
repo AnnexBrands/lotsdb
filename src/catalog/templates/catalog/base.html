@@ -12,6 +12,10 @@
     <nav class="navbar">
         <a href="/" class="nav-brand">Catalog Manager</a>
         <a href="{% url 'import_list' %}" class="nav-link">Import</a>
+        <label class="dropzone" id="dropzone">
+            Add Catalog
+            <input type="file" id="dropzone-input" accept=".xlsx,.csv,.json">
+        </label>
         <form action="{% url 'search' %}" method="get" class="nav-search">
             <input type="text" name="q" placeholder="Search by lot # or item ID..." value="{{ request.GET.q|default:'' }}">
             <button type="submit">Search</button>
@@ -30,5 +34,96 @@
     <main class="content">
         {% block content %}{% endblock %}
     </main>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+    (function() {
+        var ALLOWED = ['.xlsx', '.csv', '.json'];
+        var UPLOAD_URL = '{% url "upload_catalog" %}';
+        var CSRF = '{{ csrf_token }}';
+        var dropzone = document.getElementById('dropzone');
+        var fileInput = document.getElementById('dropzone-input');
+        var uploading = false;
+
+        function showToast(msg, type) {
+            var container = document.getElementById('toast-container');
+            var el = document.createElement('div');
+            el.className = 'toast toast-' + type;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(function() {
+                el.classList.add('fade-out');
+                setTimeout(function() { el.remove(); }, 300);
+            }, 5000);
+        }
+
+        function getExtension(name) {
+            var i = name.lastIndexOf('.');
+            return i >= 0 ? name.slice(i).toLowerCase() : '';
+        }
+
+        function handleFile(file) {
+            if (uploading) return;
+            var ext = getExtension(file.name);
+            if (ALLOWED.indexOf(ext) === -1) {
+                showToast('Unsupported file type: ' + ext + '. Accepted: .xlsx, .csv, .json', 'error');
+                return;
+            }
+            uploading = true;
+            dropzone.classList.add('uploading');
+            var fd = new FormData();
+            fd.append('file', file);
+            fetch(UPLOAD_URL, {
+                method: 'POST',
+                headers: {'X-CSRFToken': CSRF},
+                body: fd
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    showToast(data.error, 'error');
+                }
+            })
+            .catch(function() {
+                showToast('Upload failed. Please try again.', 'error');
+            })
+            .finally(function() {
+                uploading = false;
+                dropzone.classList.remove('uploading');
+            });
+        }
+
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleFile(this.files[0]);
+                this.value = '';
+            }
+        });
+
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (!uploading) dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+    })();
+    </script>
 </body>
 </html>

@@ -1,0 +1,71 @@
+openapi: "3.0.3"
+info:
+  title: Catalog Dropzone Upload API
+  version: "1.0.0"
+  description: Single endpoint for drag-and-drop catalog file import.
+
+paths:
+  /imports/upload/:
+    post:
+      operationId: uploadCatalogFile
+      summary: Upload and import a catalog file via drag-and-drop
+      description: |
+        Accepts a multipart file upload, parses it using the existing catalog
+        importer, calls bulk_insert, and returns either a redirect URL to the
+        created event page or an error message.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: "Catalog spreadsheet file (.xlsx, .csv, or .json)"
+      responses:
+        "200":
+          description: |
+            Import result. Always returns 200 with a JSON body containing
+            a `success` boolean. The client checks `success` to determine
+            whether to redirect or show a toast error. This avoids HTTP
+            status code handling in the fetch() JS and keeps the client
+            logic simple.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/UploadSuccess"
+                  - $ref: "#/components/schemas/UploadError"
+
+components:
+  schemas:
+    UploadSuccess:
+      type: object
+      required:
+        - success
+        - redirect
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        redirect:
+          type: string
+          description: URL to redirect to (event detail page)
+          example: "/events/123/"
+    UploadError:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: string
+          description: Human-readable error message
+          example: "Failed to read file: missing required column 'Catalog ID'"
