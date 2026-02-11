@@ -3,7 +3,7 @@ import time
 
 import requests
 from ABConnect.config import Config, get_config
-from ABConnect.api.catalog import CatalogAPI
+from ABConnect.api.auth import FileTokenStorage
 from ABConnect.api.catalog.http_client import CatalogRequestHandler
 from ABConnect.api.catalog.endpoints.base import BaseCatalogEndpoint
 from ABConnect.exceptions import LoginFailedError
@@ -51,22 +51,12 @@ class _SessionTokenAdapter:
 
 
 def login(request, username, password):
-    """Authenticate against ABConnect identity server and store token in session."""
+    """Authenticate via ABConnect FileTokenStorage and store token in session."""
     Config.load()
-    data = {
-        "grant_type": "password",
-        "username": username,
-        "password": password,
-        "client_id": get_config("ABC_CLIENT_ID"),
-        "client_secret": get_config("ABC_CLIENT_SECRET"),
-        "scope": "offline_access",
-        "rememberMe": True,
-    }
-    r = requests.post(Config.get_identity_url(), data=data)
-    if not r.ok:
-        raise LoginFailedError(f"Login failed: {r.status_code}")
-    token = r.json()
-    token["expires_at"] = time.time() + token["expires_in"] - 300
+    storage = FileTokenStorage(username=username, password=password)
+    token = storage._token
+    if not token:
+        raise LoginFailedError("Login failed: invalid credentials")
     request.session["abc_token"] = token
     request.session["abc_username"] = username
 
@@ -136,7 +126,7 @@ def get_catalog(request, catalog_id):
 def list_lots_by_catalog(request, customer_catalog_id, page=1, page_size=25):
     api = get_catalog_api(request)
     return api.lots.list(
-        page_number=page, page_size=page_size, customer_catalog_id=customer_catalog_id
+        page_number=page, page_size=page_size, customer_catalog_id=str(customer_catalog_id)
     )
 
 
@@ -165,5 +155,5 @@ def save_lot_override(request, lot_id, override_data):
 def search_lots(request, query, page=1, page_size=25):
     api = get_catalog_api(request)
     return api.lots.list(
-        page_number=page, page_size=page_size, customer_item_id=query
+        page_number=page, page_size=page_size, CustomerItemId=query
     )

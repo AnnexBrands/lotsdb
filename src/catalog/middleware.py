@@ -37,6 +37,6 @@ class CatalogAPIErrorMiddleware:
         if isinstance(exception, RequestException):
             logger.exception("Catalog API request failed")
             return render(request, "catalog/error.html", {
-                "message": "Unable to reach the Catalog API. Please try again later.",
+                "message": f"Unable to reach the Catalog API: {str(exception)}",
             }, status=502)
         return None
