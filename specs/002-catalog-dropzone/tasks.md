@@ -113,6 +113,18 @@ Task: "Add contract tests to tests/test_upload.py"
 
 ---
 
+## Phase 4: PR Review Fixes
+
+**Purpose**: Address Codex reviewer feedback — missing automated tests for AS1/AS2, spec-example fixtures, and test evidence.
+
+- [X] T009 [P] Create shared test fixtures in `tests/conftest.py` — `auth_session` fixture (session dict from spec examples), `sample_bulk_request` fixture (MagicMock BulkInsertRequest with `customer_catalog_id="123456"` from data-model examples). Exported as `AUTH_SESSION` constant for TestCase-based tests.
+- [X] T010 Add UI/template integration tests in `tests/integration/test_dropzone_ui.py` — covers AS1 (dropzone element present, file input with accept attribute), AS2 (dragover/dragleave/drop event listeners, classList.add/remove('dragover')), toast container, showToast function, fetch upload JS, success redirect, error toast, and multi-file (files[0]) handling. Uses Django test Client with session injection and mocked `list_sellers`.
+- [X] T011 Refactor contract tests in `tests/contract/test_upload.py` — convert from Django TestCase to pytest class, import `AUTH_SESSION` from conftest, use `auth_session` fixture via injection. All 6 original test assertions preserved.
+
+**Checkpoint**: 16 tests pass (10 integration + 6 contract). Test output included in PR body as evidence.
+
+---
+
 ## Notes
 
 - [P] tasks = different files, no dependencies
