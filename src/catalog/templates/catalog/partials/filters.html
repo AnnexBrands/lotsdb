@@ -1,0 +1,19 @@
+<form method="get" class="filters">
+    {% for field in filter_fields %}
+    <div class="filter-field">
+        <label for="filter-{{ field.name }}">{{ field.label }}</label>
+        {% if field.type == "select" %}
+        <select id="filter-{{ field.name }}" name="{{ field.name }}">
+            <option value="">All</option>
+            {% for opt_val, opt_label in field.options %}
+            <option value="{{ opt_val }}" {% if field.value == opt_val %}selected{% endif %}>{{ opt_label }}</option>
+            {% endfor %}
+        </select>
+        {% else %}
+        <input type="text" id="filter-{{ field.name }}" name="{{ field.name }}" value="{{ field.value|default:'' }}" placeholder="{{ field.placeholder|default:'' }}">
+        {% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="btn">Filter</button>
+    <a href="{{ request.path }}" class="btn btn-secondary">Clear</a>
+</form>

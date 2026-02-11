@@ -1,0 +1,230 @@
+openapi: "3.1.0"
+info:
+  title: Auction Catalog Manager - Django URL Routes
+  description: |
+    Django URL routes for the Auction Catalog Manager web application.
+    These are server-rendered HTML views using Django templates + HTMX.
+    All data operations proxy through ABConnectTools to the Catalog API.
+  version: "0.1.0"
+
+paths:
+  /:
+    get:
+      summary: Seller list (home page)
+      description: Display paginated list of sellers with filtering
+      operationId: seller_list
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 25 }
+        - name: name
+          in: query
+          schema: { type: string }
+          description: Filter by seller name (partial match)
+        - name: is_active
+          in: query
+          schema: { type: boolean }
+          description: Filter by active status
+      responses:
+        "200":
+          description: HTML page with seller list
+        "302":
+          description: Redirect to /login if not authenticated
+
+  /sellers/{seller_id}/:
+    get:
+      summary: Seller detail with events
+      description: Display seller info and their events (catalogs)
+      operationId: seller_detail
+      parameters:
+        - name: seller_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: HTML page with seller details and event list
+        "302":
+          description: Redirect to /login if not authenticated
+
+  /events/{event_id}/:
+    get:
+      summary: Event detail with lots
+      description: Display event info and its lots with pagination
+      operationId: event_detail
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 25 }
+      responses:
+        "200":
+          description: HTML page with event details and lot list
+        "302":
+          description: Redirect to /login if not authenticated
+
+  /lots/{lot_id}/:
+    get:
+      summary: Lot detail with overrides
+      description: Display full lot data, initial values vs overrides, and images
+      operationId: lot_detail
+      parameters:
+        - name: lot_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: HTML page with lot detail view
+        "302":
+          description: Redirect to /login if not authenticated
+
+  /lots/{lot_id}/override/:
+    get:
+      summary: Override edit form
+      description: Display Django form to create or edit an override for a lot
+      operationId: override_form
+      parameters:
+        - name: lot_id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: HTML form for editing overrides
+        "302":
+          description: Redirect to /login if not authenticated
+
+    post:
+      summary: Save override
+      description: Save new or updated override values for a lot
+      operationId: override_save
+      parameters:
+        - name: lot_id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/OverrideFormData"
+      responses:
+        "302":
+          description: Redirect to lot detail after successful save
+          headers:
+            Location:
+              schema: { type: string }
+        "200":
+          description: Re-render form with validation errors
+        "302 ":
+          description: Redirect to /login if not authenticated
+
+  /search/:
+    get:
+      summary: Search lots
+      description: Search for lots by customer item ID or lot number
+      operationId: search_lots
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+          description: Search query (customer item ID or lot number)
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: page_size
+          in: query
+          schema: { type: integer, default: 25 }
+      responses:
+        "200":
+          description: HTML page with search results
+        "302":
+          description: Redirect to /login if not authenticated
+
+  /login/:
+    get:
+      summary: Login page
+      operationId: login_page
+      responses:
+        "200":
+          description: HTML login form
+
+    post:
+      summary: Authenticate user
+      operationId: login_submit
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        "302":
+          description: Redirect to home on success
+        "200":
+          description: Login page re-rendered with error on failure
+
+  /logout/:
+    post:
+      summary: Log out user
+      operationId: logout_submit
+      responses:
+        "302":
+          description: Redirect to login page
+
+components:
+  schemas:
+    OverrideFormData:
+      type: object
+      description: Django form fields for lot override (all optional — only changed fields submitted)
+      properties:
+        qty:
+          type: integer
+        l:
+          type: number
+          description: Length
+        w:
+          type: number
+          description: Width
+        h:
+          type: number
+          description: Height
+        wgt:
+          type: number
+          description: Weight
+        value:
+          type: number
+        cpack:
+          type: string
+          description: Case/pack info
+        description:
+          type: string
+        notes:
+          type: string
+        noted_conditions:
+          type: string
+        commodity_id:
+          type: integer
+        force_crate:
+          type: boolean
+        do_not_tip:
+          type: boolean

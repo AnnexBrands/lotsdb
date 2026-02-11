@@ -1,0 +1,39 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}Sellers - Catalog Manager{% endblock %}
+
+{% block breadcrumbs %}<a href="/">Home</a>{% endblock %}
+
+{% block content %}
+<h1>Sellers</h1>
+
+{% include "catalog/partials/filters.html" %}
+
+{% if sellers %}
+<table>
+    <thead>
+        <tr>
+            <th>Display ID</th>
+            <th>Name</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for seller in sellers %}
+        <tr>
+            <td>{{ seller.customer_display_id }}</td>
+            <td><a href="{% url 'seller_detail' seller.id %}">{{ seller.name|default:"(unnamed)" }}</a></td>
+            <td><span class="badge {% if seller.is_active %}badge-active{% else %}badge-inactive{% endif %}">
+                {{ seller.is_active|yesno:"Active,Inactive" }}
+            </span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% include "catalog/partials/pagination.html" %}
+
+{% else %}
+<div class="empty-state">No sellers found.</div>
+{% endif %}
+{% endblock %}

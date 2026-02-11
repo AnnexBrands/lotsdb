@@ -1,0 +1,49 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}{{ event.title|default:"Event" }} - Catalog Manager{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/">Home</a>
+{% if seller %} &rsaquo; <a href="{% url 'seller_detail' seller.id %}">{{ seller.name|default:"Seller" }}</a>{% endif %}
+&rsaquo; <span>{{ event.title|default:"Event" }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+    <h1>{{ event.title|default:"(untitled)" }}</h1>
+    <dl class="meta">
+        <dt>Catalog ID</dt><dd>{{ event.customer_catalog_id|default:"—" }}</dd>
+        <dt>Agent</dt><dd>{{ event.agent|default:"—" }}</dd>
+        <dt>Dates</dt><dd>{{ event.start_date|date:"Y-m-d" }} to {{ event.end_date|date:"Y-m-d" }}</dd>
+        <dt>Status</dt><dd><span class="badge {% if event.is_completed %}badge-completed{% else %}badge-active{% endif %}">{{ event.is_completed|yesno:"Completed,Active" }}</span></dd>
+    </dl>
+</div>
+
+<h2>Lots</h2>
+
+{% if lots %}
+<table>
+    <thead>
+        <tr>
+            <th>Lot #</th>
+            <th>Item ID</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for lot in lots %}
+        <tr>
+            <td><a href="{% url 'lot_detail' lot.id %}">{{ lot.lot_number|default:lot.id }}</a></td>
+            <td>{{ lot.customer_item_id|default:"—" }}</td>
+            <td>{{ lot.initial_data.description|default:"—"|truncatewords:20 }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% include "catalog/partials/pagination.html" %}
+
+{% else %}
+<div class="empty-state">This event has no lots.</div>
+{% endif %}
+{% endblock %}

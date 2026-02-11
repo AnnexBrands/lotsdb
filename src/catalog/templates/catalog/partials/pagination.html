@@ -1,0 +1,18 @@
+{% if paginated.total_pages > 1 %}
+<nav class="pagination">
+    {% if paginated.has_previous_page %}
+    <a href="?page={{ paginated.page_number|add:"-1" }}{% for k, v in preserved_params.items %}&{{ k }}={{ v }}{% endfor %}"
+       class="page-link">&laquo; Previous</a>
+    {% endif %}
+
+    <span class="page-info">
+        Page {{ paginated.page_number }} of {{ paginated.total_pages }}
+        ({{ paginated.total_items }} total)
+    </span>
+
+    {% if paginated.has_next_page %}
+    <a href="?page={{ paginated.page_number|add:"1" }}{% for k, v in preserved_params.items %}&{{ k }}={{ v }}{% endfor %}"
+       class="page-link">Next &raquo;</a>
+    {% endif %}
+</nav>
+{% endif %}
