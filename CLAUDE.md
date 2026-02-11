@@ -5,6 +5,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-10
 ## Active Technologies
 - Python 3.14, Django 5 + Django 5, HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) (002-catalog-dropzone)
 - SQLite3 (sessions only); file uploads are in-memory/tempfile, not persisted (002-catalog-dropzone)
+- SQLite3 (sessions only); no new storage — all data from ABConnect API (003-spa-shell-layout)
 
 - Python 3.14, Django 5 + Django 5, HTMX (CDN), ABConnectTools 0.2.1 (editable install) (001-auction-catalog-manager)
 
@@ -24,9 +25,10 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.14, Django 5: Follow standard conventions
 
 ## Recent Changes
+- 003-spa-shell-layout: Added Python 3.14, Django 5 + Django 5, HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
+- 003-spa-shell-layout: Added Python 3.14, Django 5 + Django 5, HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 - 002-catalog-dropzone: Added Python 3.14, Django 5 + Django 5, HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 
-- 001-auction-catalog-manager: Added Python 3.14, Django 5 + Django 5, HTMX (CDN), ABConnectTools 0.2.1 (editable install)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

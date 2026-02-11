@@ -10,7 +10,7 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     <nav class="navbar">
-        <a href="/" class="nav-brand">Catalog Manager</a>
+        <a href="/" class="nav-brand"><img src="{% static 'catalog/lotsdb_logo.svg' %}" alt="LotsDB" height="28"></a>
         <a href="{% url 'import_list' %}" class="nav-link">Import</a>
         <label class="dropzone" id="dropzone">
             Add Catalog
@@ -27,6 +27,7 @@
         </form>
     </nav>
 
+    {% block body_content %}
     <div class="breadcrumbs">
         {% block breadcrumbs %}<a href="/">Home</a>{% endblock %}
     </div>
@@ -34,6 +35,7 @@
     <main class="content">
         {% block content %}{% endblock %}
     </main>
+    {% endblock %}
 
     <div id="toast-container" class="toast-container"></div>
 

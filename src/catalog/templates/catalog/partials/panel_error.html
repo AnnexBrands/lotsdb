@@ -1,0 +1,6 @@
+<div class="panel-error">
+    <p>{{ error_message|default:"Something went wrong" }}</p>
+    {% if retry_url %}
+    <button hx-get="{{ retry_url }}" hx-target="{{ retry_target }}" hx-swap="innerHTML">Retry</button>
+    {% endif %}
+</div>

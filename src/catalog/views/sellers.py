@@ -34,6 +34,13 @@ def seller_list(request):
     if is_active:
         preserved_params["is_active"] = is_active
 
+    # Home page (/) renders the SPA shell; /sellers/ renders the full-page list
+    if request.path == "/":
+        return render(request, "catalog/shell.html", {
+            "sellers": result.items,
+            "paginated": result,
+        })
+
     return render(request, "catalog/sellers/list.html", {
         "sellers": result.items,
         "paginated": result,

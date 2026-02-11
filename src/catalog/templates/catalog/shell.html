@@ -1,0 +1,34 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}LotsDB — Catalog Manager{% endblock %}
+
+{% block body_content %}
+<div class="shell">
+    <div id="panel-left1" class="panel panel-left1" hx-sync="this:replace">
+        <div class="panel-header">
+            <h3>Sellers{% if sellers %}<span class="panel-count">({{ paginated.total_items }})</span>{% endif %}</h3>
+        </div>
+        <div id="panel-left1-content">
+            {% include "catalog/partials/seller_list_panel.html" %}
+        </div>
+    </div>
+    <div id="panel-left2" class="panel panel-left2" hx-sync="this:replace">
+        <div class="htmx-indicator"><div class="spinner"></div></div>
+        <div id="panel-left2-content" class="panel-content">
+            <div class="panel-empty">
+                <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M10 4v16"/></svg></div>
+                <p>Select a seller to view events</p>
+            </div>
+        </div>
+    </div>
+    <div id="panel-main" class="panel panel-main" hx-sync="this:replace">
+        <div class="htmx-indicator"><div class="spinner"></div></div>
+        <div id="panel-main-content" class="panel-content">
+            <div class="panel-empty">
+                <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>
+                <p>Select an event to view lots</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

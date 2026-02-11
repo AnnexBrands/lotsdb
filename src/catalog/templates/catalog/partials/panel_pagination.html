@@ -1,0 +1,15 @@
+{% if paginated.total_pages > 1 %}
+<div class="panel-pagination">
+    {% if paginated.has_previous_page %}
+    <a hx-get="{{ base_url }}?page={{ paginated.page_number|add:"-1" }}{% for k, v in extra_params.items %}&{{ k }}={{ v }}{% endfor %}"
+       hx-target="{{ target_id }}"
+       hx-swap="innerHTML">&laquo; Prev</a>
+    {% endif %}
+    <span class="page-info">{{ paginated.page_number }} / {{ paginated.total_pages }}</span>
+    {% if paginated.has_next_page %}
+    <a hx-get="{{ base_url }}?page={{ paginated.page_number|add:"1" }}{% for k, v in extra_params.items %}&{{ k }}={{ v }}{% endfor %}"
+       hx-target="{{ target_id }}"
+       hx-swap="innerHTML">&raquo; Next</a>
+    {% endif %}
+</div>
+{% endif %}
