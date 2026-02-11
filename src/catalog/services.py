@@ -154,6 +154,12 @@ def save_lot_override(request, lot_id, override_data):
     return api.lots.update(lot_id, update_req)
 
 
+def bulk_insert(request, data):
+    """Insert catalog data via the bulk endpoint."""
+    api = get_catalog_api(request)
+    return api.bulk.insert(data)
+
+
 def search_lots(request, query, page=1, page_size=25):
     """Search lots by customer item ID and lot number, combining results."""
     api = get_catalog_api(request)
