@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "lotsdb"
+version = "0.1.0"
+description = "Auction Catalog Manager - browse and override lot data"
+requires-python = ">=3.11"
+dependencies = [
+    "Django>=5.0,<6.0",
+    "ABConnect",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-django>=4.8",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+pythonpath = ["src"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

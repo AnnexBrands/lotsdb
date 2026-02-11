@@ -1,0 +1,53 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}{{ seller.name|default:"Seller" }} - Catalog Manager{% endblock %}
+
+{% block breadcrumbs %}
+<a href="/">Home</a> &rsaquo; <span>{{ seller.name|default:"Seller" }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="detail-header">
+    <h1>{{ seller.name|default:"(unnamed)" }}</h1>
+    <dl class="meta">
+        <dt>Display ID</dt><dd>{{ seller.customer_display_id }}</dd>
+        <dt>Status</dt><dd><span class="badge {% if seller.is_active %}badge-active{% else %}badge-inactive{% endif %}">{{ seller.is_active|yesno:"Active,Inactive" }}</span></dd>
+    </dl>
+</div>
+
+<h2>Events</h2>
+
+{% include "catalog/partials/filters.html" %}
+
+{% if events %}
+<table>
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Agent</th>
+            <th>Start Date</th>
+            <th>End Date</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for event in events %}
+        <tr>
+            <td><a href="{% url 'event_detail' event.id %}">{{ event.title|default:"(untitled)" }}</a></td>
+            <td>{{ event.agent|default:"—" }}</td>
+            <td>{{ event.start_date|date:"Y-m-d" }}</td>
+            <td>{{ event.end_date|date:"Y-m-d" }}</td>
+            <td><span class="badge {% if event.is_completed %}badge-completed{% else %}badge-active{% endif %}">
+                {{ event.is_completed|yesno:"Completed,Active" }}
+            </span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% include "catalog/partials/pagination.html" %}
+
+{% else %}
+<div class="empty-state">This seller has no events.</div>
+{% endif %}
+{% endblock %}

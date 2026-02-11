@@ -1,0 +1,46 @@
+{% extends "catalog/base.html" %}
+
+{% block title %}Import Files - Catalog Manager{% endblock %}
+
+{% block breadcrumbs %}<a href="/">Home</a> &rsaquo; Import{% endblock %}
+
+{% block content %}
+<h1>Import Catalog Files</h1>
+
+{% if messages %}
+<div class="messages">
+    {% for message in messages %}
+    <div class="message message-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if files %}
+<table>
+    <thead>
+        <tr>
+            <th>Filename</th>
+            <th>Size</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for file in files %}
+        <tr>
+            <td>{{ file.name }}</td>
+            <td>{{ file.size }}</td>
+            <td>
+                <form method="post" action="{% url 'import_file' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="filename" value="{{ file.name }}">
+                    <button type="submit" onclick="return confirm('Import {{ file.name }}?')">Import</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state">No importable files found in FILES/ directory.</div>
+{% endif %}
+{% endblock %}
