@@ -3,32 +3,93 @@
 {% block title %}LotsDB — Catalog Manager{% endblock %}
 
 {% block body_content %}
-<div class="shell">
-    <div id="panel-left1" class="panel panel-left1" hx-sync="this:replace">
+<div class="shell" data-mobile-panel="sellers">
+    <button class="mobile-back-btn" aria-label="Back" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+        Back
+    </button>
+    <div id="panel-left1" class="panel panel-left1" data-panel="sellers" hx-sync="this:replace">
+        <div class="htmx-indicator"><div class="spinner"></div></div>
         <div class="panel-header">
             <h3>Sellers{% if sellers %}<span class="panel-count">({{ paginated.total_items }})</span>{% endif %}</h3>
         </div>
-        <div id="panel-left1-content">
+        <div id="panel-left1-content" class="panel-content">
             {% include "catalog/partials/seller_list_panel.html" %}
         </div>
     </div>
-    <div id="panel-left2" class="panel panel-left2" hx-sync="this:replace">
+    <div id="panel-left2" class="panel panel-left2" data-panel="events" hx-sync="this:replace">
         <div class="htmx-indicator"><div class="spinner"></div></div>
         <div id="panel-left2-content" class="panel-content">
+            {% if hydrate_events is not None %}
+                {% include "catalog/partials/events_panel.html" with seller=hydrate_seller events=hydrate_events paginated=hydrate_events_paginated seller_id=selected_seller_id pagination_url="" selected_event_id=selected_event_id oob_sellers=None %}
+            {% else %}
             <div class="panel-empty">
                 <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M10 4v16"/></svg></div>
                 <p>Select a seller to view events</p>
             </div>
+            {% endif %}
         </div>
     </div>
-    <div id="panel-main" class="panel panel-main" hx-sync="this:replace">
+    <div id="panel-main" class="panel panel-main" data-panel="lots" hx-sync="this:replace">
         <div class="htmx-indicator"><div class="spinner"></div></div>
         <div id="panel-main-content" class="panel-content">
+            {% if hydrate_lots is not None %}
+                {% include "catalog/partials/lots_panel.html" with event=hydrate_event lots=hydrate_lots paginated=hydrate_lots_paginated event_id=selected_event_id seller_id=selected_seller_id pagination_url="" selected_event_id=selected_event_id oob_events=None %}
+            {% else %}
             <div class="panel-empty">
                 <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>
                 <p>Select an event to view lots</p>
             </div>
+            {% endif %}
         </div>
     </div>
+    <div id="panel-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 </div>
+<script>
+(function() {
+    var shell = document.querySelector('.shell');
+    if (!shell) return;
+    var backBtn = shell.querySelector('.mobile-back-btn');
+    var announcer = document.getElementById('panel-announcer');
+    var panelOrder = ['sellers', 'events', 'lots'];
+    var panelLabels = {sellers: 'Sellers', events: 'Events', lots: 'Lots'};
+
+    function isMobile() {
+        return window.matchMedia('(max-width: 767px)').matches;
+    }
+
+    function showPanel(name) {
+        shell.setAttribute('data-mobile-panel', name);
+        backBtn.hidden = (name === 'sellers');
+        if (announcer) announcer.textContent = panelLabels[name] + ' panel';
+        var panel = shell.querySelector('[data-panel="' + name + '"]');
+        if (panel) {
+            var focusable = panel.querySelector('a, button, input, [tabindex]');
+            if (focusable) focusable.focus();
+        }
+    }
+
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (!isMobile()) return;
+        var target = e.detail.target;
+        if (target.id === 'panel-left2-content') {
+            showPanel('events');
+        } else if (target.id === 'panel-main-content') {
+            showPanel('lots');
+        }
+    });
+
+    backBtn.addEventListener('click', function() {
+        var current = shell.getAttribute('data-mobile-panel');
+        var idx = panelOrder.indexOf(current);
+        if (idx > 0) showPanel(panelOrder[idx - 1]);
+    });
+
+    window.addEventListener('resize', function() {
+        if (!isMobile()) {
+            backBtn.hidden = true;
+        }
+    });
+})();
+</script>
 {% endblock %}

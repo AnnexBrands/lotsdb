@@ -186,3 +186,21 @@ tbody tr:hover { background: #f8fafc; }
 .toast.fade-out { animation: toast-out 0.3s ease-in forwards; }
 @keyframes toast-in { from { opacity: 0; transform: translateX(1rem); } to { opacity: 1; transform: translateX(0); } }
 @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+
+/* === Screen Reader Only === */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* === Mobile Back Button === */
+.mobile-back-btn { display: none; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.8rem; color: #475569; cursor: pointer; position: fixed; top: 60px; left: 0.5rem; z-index: 20; }
+.mobile-back-btn:hover { background: #e2e8f0; }
+
+/* === Mobile/Narrow Viewport === */
+@media (max-width: 767px) {
+    .shell { grid-template-columns: 1fr; }
+    .panel { display: none; border-right: none; }
+    .shell[data-mobile-panel="sellers"] [data-panel="sellers"] { display: block; }
+    .shell[data-mobile-panel="events"] [data-panel="events"] { display: block; }
+    .shell[data-mobile-panel="lots"] [data-panel="lots"] { display: block; }
+    .mobile-back-btn[hidden] { display: none !important; }
+    .mobile-back-btn:not([hidden]) { display: flex; }
+}

@@ -27,3 +27,9 @@
         <p>Select an event to view lots</p>
     </div>
 </div>
+
+{% if oob_sellers is not None %}
+<div id="panel-left1-content" hx-swap-oob="innerHTML">
+    {% include "catalog/partials/seller_list_panel.html" with sellers=oob_sellers paginated=oob_sellers_paginated selected_seller_id=selected_seller_id %}
+</div>
+{% endif %}
