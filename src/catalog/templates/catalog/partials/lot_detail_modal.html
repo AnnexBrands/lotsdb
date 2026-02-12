@@ -1,0 +1,59 @@
+{% load catalog_tags %}
+<div data-lot-title="Lot {{ lot.catalogs.0.lot_number|default:lot.id }}">
+    <div class="detail-header">
+        <h1>Lot {{ lot.catalogs.0.lot_number|default:lot.id }}</h1>
+        <dl class="meta">
+            <dt>Customer Item ID</dt><dd>{{ lot.customer_item_id|default:"—" }}</dd>
+        </dl>
+        <div style="margin-top: 0.75rem;">
+            <button hx-get="/panels/lots/{{ lot.id }}/detail/?edit=1" hx-target="#lot-modal-body" hx-swap="innerHTML" class="btn btn-primary">Edit Override</button>
+        </div>
+    </div>
+
+    <div class="lot-data">
+        <h2>Lot Data</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Initial Value</th>
+                    {% if has_override %}<th>Override Value</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td><strong>{{ row.label }}</strong></td>
+                    <td>
+                        {% if row.is_flag %}
+                            {% if row.initial %}<span class="badge badge-flag">{{ row.label }}</span>{% else %}—{% endif %}
+                        {% else %}
+                            {{ row.initial|display_val }}
+                        {% endif %}
+                    </td>
+                    {% if has_override %}
+                    <td class="{% if row.changed %}changed{% endif %}">
+                        {% if row.is_flag %}
+                            {% if row.override %}<span class="badge badge-flag">{{ row.label }}</span>{% else %}—{% endif %}
+                        {% else %}
+                            {{ row.override|display_val }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if lot.image_links %}
+    <div class="lot-data">
+        <h2>Images</h2>
+        <div class="images">
+            {% for img in lot.image_links %}
+            <img src="{{ img.link }}" alt="Lot image {{ forloop.counter }}">
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>

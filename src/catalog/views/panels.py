@@ -1,9 +1,11 @@
+import json
 import logging
 
 from django.shortcuts import render
 
 from ABConnect.exceptions import ABConnectError
 from catalog import services
+from catalog.forms import OverrideForm
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +212,113 @@ def event_lots_panel(request, event_id):
         seller_display_id = event.sellers[0].customer_display_id
         response["HX-Push-Url"] = f"/?seller={seller_display_id}&event={event.customer_catalog_id}"
     return response
+
+
+_LOT_DETAIL_FIELDS = [
+    ("Quantity", "qty", False),
+    ("Length", "l", False),
+    ("Width", "w", False),
+    ("Height", "h", False),
+    ("Weight", "wgt", False),
+    ("Value", "value", False),
+    ("Case/Pack", "cpack", False),
+    ("Description", "description", False),
+    ("Notes", "notes", False),
+    ("Conditions", "noted_conditions", False),
+    ("Commodity ID", "commodity_id", False),
+    ("Force Crate", "force_crate", True),
+    ("Do Not Tip", "do_not_tip", True),
+]
+
+
+def _build_detail_rows(lot):
+    """Build field rows for the lot detail modal (all 13 fields)."""
+    initial = lot.initial_data
+    override = lot.overriden_data[0] if lot.overriden_data else None
+    rows = []
+    for label, attr, is_flag in _LOT_DETAIL_FIELDS:
+        init_val = getattr(initial, attr, None) if initial else None
+        over_val = getattr(override, attr, None) if override else None
+        changed = override is not None and over_val != init_val
+        rows.append({
+            "label": label,
+            "attr": attr,
+            "initial": init_val,
+            "override": over_val,
+            "changed": changed,
+            "is_flag": is_flag,
+        })
+    return rows, override is not None
+
+
+def lot_detail_panel(request, lot_id):
+    """Return HTML fragment for the lot detail/edit modal."""
+    try:
+        lot = services.get_lot(request, lot_id)
+    except ABConnectError:
+        logger.exception("Failed to load lot %s", lot_id)
+        return render(request, "catalog/partials/panel_error.html", {
+            "error_message": "Could not load lot details",
+            "retry_url": f"/panels/lots/{lot_id}/detail/",
+            "retry_target": "#lot-modal-body",
+        })
+
+    if request.method == "POST":
+        form = OverrideForm(request.POST)
+        if form.is_valid():
+            override_data = {k: v for k, v in form.cleaned_data.items() if v is not None}
+            try:
+                services.save_lot_override(request, lot_id, override_data)
+                lot = services.get_lot(request, lot_id)
+                lot_rows = build_lot_table_rows([lot])
+                response = render(request, "catalog/partials/lots_table_row.html", {
+                    "row": lot_rows[0],
+                    "oob": True,
+                })
+                response["HX-Trigger"] = json.dumps({
+                    "closeModal": True,
+                    "showToast": {"message": "Override saved", "type": "success"},
+                })
+                return response
+            except ABConnectError:
+                logger.exception("Failed to save override for lot %s", lot_id)
+                response = render(request, "catalog/partials/panel_error.html", {
+                    "error_message": "Could not save override",
+                    "retry_url": f"/panels/lots/{lot_id}/detail/?edit=1",
+                    "retry_target": "#lot-modal-body",
+                })
+                response["HX-Trigger"] = json.dumps({
+                    "showToast": {"message": "Could not save override", "type": "error"},
+                })
+                return response
+        else:
+            return render(request, "catalog/partials/lot_edit_modal.html", {
+                "lot": lot,
+                "form": form,
+            })
+
+    # GET request
+    if request.GET.get("edit") == "1":
+        override = lot.overriden_data[0] if lot.overriden_data else None
+        source = override or lot.initial_data
+        initial_data = {}
+        if source:
+            for field_name in OverrideForm.base_fields:
+                val = getattr(source, field_name, None)
+                if val is not None:
+                    initial_data[field_name] = val
+        form = OverrideForm(initial=initial_data)
+        return render(request, "catalog/partials/lot_edit_modal.html", {
+            "lot": lot,
+            "form": form,
+        })
+
+    rows, has_override = _build_detail_rows(lot)
+    return render(request, "catalog/partials/lot_detail_modal.html", {
+        "lot": lot,
+        "has_override": has_override,
+        "rows": rows,
+    })
 
 
 def lot_override_panel(request, lot_id):
