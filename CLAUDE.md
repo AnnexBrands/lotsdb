@@ -9,6 +9,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-10
 - SQLite3 (sessions only — no new storage) (004-shell-interaction-polish)
 - Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (005-shell-ux-fixes)
 - Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) (006-lots-table-bugfix)
+- Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) + Django templates, HTMX, vanilla JS, CSS (008-lots-table-ux-polish)
 
 - Python 3.14, Django 5 + Django 5, HTMX (CDN), ABConnectTools 0.2.1 (editable install) (001-auction-catalog-manager)
 
@@ -28,9 +29,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.14, Django 5: Follow standard conventions
 
 ## Recent Changes
+- 008-lots-table-ux-polish: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) + Django templates, HTMX, vanilla JS, CSS
 - 007-lot-detail-modal: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 - 006-lots-table-bugfix: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
-- 005-shell-ux-fixes: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1
 
 
 <!-- MANUAL ADDITIONS START -->
