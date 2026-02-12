@@ -147,6 +147,33 @@ tbody tr:hover { background: #f8fafc; }
 .panel-pagination a:hover { background: #f1f5f9; text-decoration: none; }
 .panel-pagination .page-info { color: #64748b; }
 
+/* === Lots Table (Main Panel) === */
+.lots-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8125rem; }
+.lots-table thead { background: #f8fafc; position: sticky; top: 0; z-index: 1; }
+.lots-table th { text-align: left; padding: 0.4rem 0.5rem; font-weight: 600; font-size: 0.6875rem; color: #475569; border-bottom: 2px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+.lots-table td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.lots-table tbody tr:hover { background: #f8fafc; }
+.lot-thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 3px; display: block; }
+.lot-thumb-placeholder { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #f1f5f9; border-radius: 3px; }
+.lot-thumb-placeholder svg { width: 20px; height: 20px; opacity: 0.25; }
+.lot-thumb-cell { width: 52px; }
+.lot-desc-cell { display: flex; flex-direction: column; gap: 0.125rem; }
+.lot-desc-title { font-weight: 500; color: #1e293b; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lot-desc-notes { font-size: 0.75rem; color: #64748b; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 4px; color: #64748b; transition: background 0.15s ease, color 0.15s ease; }
+.btn-icon:hover { background: #f1f5f9; color: #2563eb; text-decoration: none; }
+.overridden { background: #fff3cd; }
+.lots-table input[type="text"],
+.lots-table input[type="number"] { padding: 0.2rem 0.35rem; border: 1px solid #e2e8f0; border-radius: 3px; font-size: 0.75rem; background: #fff; color: #1e293b; }
+.lots-table input[type="text"]:focus,
+.lots-table input[type="number"]:focus { outline: none; border-color: #2563eb; }
+.lot-input-num { width: 52px; text-align: right; }
+.lot-input-wide { width: 100%; }
+.lot-input-sm { font-size: 0.6875rem; color: #64748b; }
+.lots-table input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.lots-table .htmx-indicator { display: none; }
+.lots-table tr.htmx-request { opacity: 0.5; pointer-events: none; }
+
 /* === Lot Cards (Main Panel) === */
 .lot-cards { list-style: none; margin: 0; padding: 0; }
 .lot-card { border-bottom: 1px solid #f1f5f9; }

@@ -1,0 +1,22 @@
+<table class="lots-table">
+    <thead>
+        <tr>
+            <th>Img</th>
+            <th>Desc/Notes</th>
+            <th>Qty</th>
+            <th>L</th>
+            <th>W</th>
+            <th>H</th>
+            <th>Wgt</th>
+            <th>CPack</th>
+            <th>Crate</th>
+            <th>DNT</th>
+            <th>Save</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in lot_rows %}
+        {% include "catalog/partials/lots_table_row.html" with row=row %}
+        {% endfor %}
+    </tbody>
+</table>
