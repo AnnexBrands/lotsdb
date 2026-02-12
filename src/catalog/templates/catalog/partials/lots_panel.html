@@ -3,7 +3,7 @@
 </div>
 {% if lot_rows %}
 {% include "catalog/partials/lots_table.html" with lot_rows=lot_rows %}
-{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-main-content" indicator_id="#panel-main .htmx-indicator" %}
+{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-main-content" extra_params=pagination_extra_params indicator_id="#panel-main .htmx-indicator" %}
 {% else %}
 <div class="panel-empty">
     <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>

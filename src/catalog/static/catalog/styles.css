@@ -142,10 +142,18 @@ tbody tr:hover { background: #f8fafc; }
 .panel-table td a { color: #2563eb; }
 .panel-table td a:hover { text-decoration: underline; }
 
-.panel-pagination { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.5rem 1rem; border-top: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.75rem; position: sticky; bottom: 0; }
+.panel-pagination { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border-top: 1px solid #e2e8f0; background: #f8fafc; font-size: 0.75rem; position: sticky; bottom: 0; flex-wrap: wrap; }
 .panel-pagination a { padding: 0.2rem 0.625rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.75rem; color: #2563eb; cursor: pointer; text-decoration: none; transition: background 0.15s ease; }
 .panel-pagination a:hover { background: #f1f5f9; text-decoration: none; }
 .panel-pagination .page-info { color: #64748b; }
+.panel-pagination .page-range { color: #64748b; font-size: 0.6875rem; }
+.panel-pagination .page-jump { cursor: pointer; }
+.panel-pagination .page-display { color: #2563eb; border-bottom: 1px dashed #2563eb; }
+.panel-pagination .page-display:hover { color: #1d4ed8; }
+.panel-pagination .page-input { width: 3.5em; padding: 0.1rem 0.25rem; border: 1px solid #2563eb; border-radius: 3px; font-size: 0.75rem; text-align: center; color: #1e293b; }
+.panel-pagination .page-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+.panel-pagination .page-size-select { padding: 0.15rem 0.25rem; border: 1px solid #e2e8f0; border-radius: 3px; font-size: 0.6875rem; color: #64748b; background: #fff; cursor: pointer; }
+.panel-pagination .page-size-select:focus { outline: none; border-color: #2563eb; }
 
 /* === Lots Table (Main Panel) === */
 .lots-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 0.8125rem; }

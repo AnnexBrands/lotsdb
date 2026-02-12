@@ -19,7 +19,7 @@
     </li>
     {% endfor %}
 </ul>
-{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-left2-content" indicator_id="#panel-left2 .htmx-indicator" %}
+{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-left2-content" extra_params=pagination_extra_params indicator_id="#panel-left2 .htmx-indicator" %}
 {% else %}
 <div class="panel-empty">
     <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M10 4v16"/></svg></div>

@@ -29,9 +29,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.14, Django 5: Follow standard conventions
 
 ## Recent Changes
+- 009-pagination-ux: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 - 008-lots-table-ux-polish: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) + Django templates, HTMX, vanilla JS, CSS
 - 007-lot-detail-modal: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
-- 006-lots-table-bugfix: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 
 
 <!-- MANUAL ADDITIONS START -->

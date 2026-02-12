@@ -1,15 +1,29 @@
 {% if paginated.total_pages > 1 %}
-<div class="panel-pagination">
+<div class="panel-pagination"
+     data-base-url="{{ base_url }}"
+     data-target="{{ target_id }}"
+     data-indicator="{% if indicator_id %}{{ indicator_id }}{% endif %}"
+     data-extra-params="{% for k, v in extra_params.items %}&{{ k }}={{ v }}{% endfor %}">
     {% if paginated.has_previous_page %}
     <a hx-get="{{ base_url }}?page={{ paginated.page_number|add:"-1" }}{% for k, v in extra_params.items %}&{{ k }}={{ v }}{% endfor %}"
        hx-target="{{ target_id }}"
        hx-swap="innerHTML"{% if indicator_id %} hx-indicator="{{ indicator_id }}"{% endif %}>&laquo; Prev</a>
     {% endif %}
-    <span class="page-info">{{ paginated.page_number }} / {{ paginated.total_pages }}</span>
+    <span class="page-range">{{ paginated.start_item }}&ndash;{{ paginated.end_item }} of {{ paginated.total_items }}</span>
+    <span class="page-jump">
+        <span class="page-display">{{ paginated.page_number }} / {{ paginated.total_pages }}</span>
+        <input type="number" class="page-input" min="1" max="{{ paginated.total_pages }}" value="{{ paginated.page_number }}" hidden>
+    </span>
     {% if paginated.has_next_page %}
     <a hx-get="{{ base_url }}?page={{ paginated.page_number|add:"1" }}{% for k, v in extra_params.items %}&{{ k }}={{ v }}{% endfor %}"
        hx-target="{{ target_id }}"
-       hx-swap="innerHTML"{% if indicator_id %} hx-indicator="{{ indicator_id }}"{% endif %}>&raquo; Next</a>
+       hx-swap="innerHTML"{% if indicator_id %} hx-indicator="{{ indicator_id }}"{% endif %}>Next &raquo;</a>
     {% endif %}
+    <select class="page-size-select" title="Items per page">
+        <option value="10"{% if paginated.page_size == 10 %} selected{% endif %}>10</option>
+        <option value="25"{% if paginated.page_size == 25 %} selected{% endif %}>25</option>
+        <option value="50"{% if paginated.page_size == 50 %} selected{% endif %}>50</option>
+        <option value="100"{% if paginated.page_size == 100 %} selected{% endif %}>100</option>
+    </select>
 </div>
 {% endif %}

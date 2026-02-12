@@ -71,6 +71,30 @@ def build_lot_table_rows(lots):
     return rows
 
 
+def _enrich_pagination(paginated, page_size):
+    """Add start_item, end_item, page_size to a Paginated object or dict."""
+    if isinstance(paginated, dict):
+        total = paginated["total_items"]
+        pg = paginated["page_number"]
+        paginated["start_item"] = (pg - 1) * page_size + 1 if total > 0 else 0
+        paginated["end_item"] = min(pg * page_size, total)
+        paginated["page_size"] = page_size
+        return paginated
+    # Wrap API Paginated object in a dict for uniform template access
+    total = paginated.total_items
+    pg = paginated.page_number
+    return {
+        "page_number": pg,
+        "total_pages": paginated.total_pages,
+        "total_items": total,
+        "has_previous_page": paginated.has_previous_page,
+        "has_next_page": paginated.has_next_page,
+        "start_item": (pg - 1) * page_size + 1 if total > 0 else 0,
+        "end_item": min(pg * page_size, total),
+        "page_size": page_size,
+    }
+
+
 def _parse_int_or_none(value):
     """Parse a string to int, returning None on failure."""
     if value is None:
@@ -101,13 +125,17 @@ def sellers_panel(request):
             "retry_target": "#panel-left1-content",
         })
 
+    paginated = _enrich_pagination(result, page_size)
+
     extra_params = {}
     if selected_seller_id:
         extra_params["selected"] = selected_seller_id
+    if page_size != 50:
+        extra_params["page_size"] = page_size
 
     return render(request, "catalog/partials/seller_list_panel.html", {
         "sellers": result.items,
-        "paginated": result,
+        "paginated": paginated,
         "selected_seller_id": selected_seller_id,
         "pagination_extra_params": extra_params,
         "filter_name": filter_name,
@@ -135,17 +163,23 @@ def seller_events_panel(request, seller_id):
             "retry_target": "#panel-left2-content",
         })
 
+    paginated = _enrich_pagination(result, page_size)
+
+    extra_params = {"selected": seller_id}
+    if page_size != 50:
+        extra_params["page_size"] = page_size
+
     response = render(request, "catalog/partials/events_panel.html", {
         "seller": seller,
         "events": result.items,
-        "paginated": result,
+        "paginated": paginated,
         "seller_id": seller_id,
         "pagination_url": f"/panels/sellers/{seller_id}/events/",
         "selected_seller_id": seller_id,
         "selected_seller_name": seller.name,
         "oob_sellers": sellers_result.items,
         "oob_sellers_paginated": sellers_result,
-        "pagination_extra_params": {"selected": seller_id},
+        "pagination_extra_params": extra_params,
         "filter_title": filter_title,
     })
     response["HX-Push-Url"] = f"/?seller={seller.customer_display_id}"
@@ -164,6 +198,9 @@ def _paginate_locally(items, page, page_size):
         "total_items": total,
         "has_previous_page": page > 1,
         "has_next_page": page < total_pages,
+        "start_item": (page - 1) * page_size + 1 if total > 0 else 0,
+        "end_item": min(page * page_size, total),
+        "page_size": page_size,
     }
     return page_items, paginated
 
@@ -194,6 +231,10 @@ def event_lots_panel(request, event_id):
             "retry_target": "#panel-main-content",
         })
 
+    extra_params = {}
+    if page_size != 25:
+        extra_params["page_size"] = page_size
+
     context = {
         "event": event,
         "lots": page_lot_refs,
@@ -202,6 +243,7 @@ def event_lots_panel(request, event_id):
         "event_id": event_id,
         "seller_id": seller_id,
         "pagination_url": f"/panels/events/{event_id}/lots/",
+        "pagination_extra_params": extra_params,
         "selected_event_id": event_id,
     }
     if events_result:
