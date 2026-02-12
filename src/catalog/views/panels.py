@@ -338,6 +338,8 @@ def lot_override_panel(request, lot_id):
                 override_data[field] = float(val) if "." in val else int(val)
             except (ValueError, TypeError):
                 pass
+    # Notes is not submitted from the inline row form (only editable via detail modal).
+    # Empty/absent values are skipped, so existing notes overrides are preserved.
     for field in ("description", "notes", "cpack"):
         val = request.POST.get(field, "").strip()
         if val:

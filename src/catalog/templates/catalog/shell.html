@@ -157,6 +157,75 @@
             }
         });
     }
+
+    // --- Row auto-save logic ---
+    function getLotRow(el) {
+        var tr = el.closest('tr[id^="lot-row-"]');
+        return tr;
+    }
+
+    // Mark row dirty on input/change
+    document.body.addEventListener('input', function(e) {
+        var tr = getLotRow(e.target);
+        if (!tr) return;
+        tr.dataset.dirty = '1';
+        var btn = tr.querySelector('.btn-icon');
+        if (btn) { btn.classList.add('save-dirty'); btn.classList.remove('save-clean'); }
+    });
+    document.body.addEventListener('change', function(e) {
+        var tr = getLotRow(e.target);
+        if (!tr) return;
+        tr.dataset.dirty = '1';
+        var btn = tr.querySelector('.btn-icon');
+        if (btn) { btn.classList.add('save-dirty'); btn.classList.remove('save-clean'); }
+    });
+
+    // Debounced auto-save on row blur
+    document.body.addEventListener('focusout', function(e) {
+        var tr = getLotRow(e.target);
+        if (!tr || tr.dataset.dirty !== '1') return;
+        // Check if focus is moving to another element in the same row
+        setTimeout(function() {
+            var active = document.activeElement;
+            if (active && tr.contains(active)) return;
+            tr._autoSaveTimer = setTimeout(function() {
+                tr._autoSaveTimer = null;
+                if (tr.dataset.dirty === '1') htmx.trigger(tr, 'submit');
+            }, 2000);
+        }, 0);
+    });
+
+    // Cancel auto-save if focus returns to the row
+    document.body.addEventListener('focusin', function(e) {
+        var tr = getLotRow(e.target);
+        if (tr && tr._autoSaveTimer) {
+            clearTimeout(tr._autoSaveTimer);
+            tr._autoSaveTimer = null;
+        }
+    });
+
+    // Clear timer on immediate save click
+    document.body.addEventListener('click', function(e) {
+        if (!e.target.closest('.btn-icon[type="submit"]')) return;
+        var tr = getLotRow(e.target);
+        if (tr && tr._autoSaveTimer) {
+            clearTimeout(tr._autoSaveTimer);
+            tr._autoSaveTimer = null;
+        }
+    });
+
+    // Mark row clean after successful HTMX swap
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        var tr = e.detail.target;
+        if (!tr || !tr.id || !tr.id.startsWith('lot-row-')) return;
+        tr.dataset.dirty = '';
+        var btn = tr.querySelector('.btn-icon');
+        if (btn) {
+            btn.classList.remove('save-dirty');
+            btn.classList.add('save-clean');
+            setTimeout(function() { btn.classList.remove('save-clean'); }, 3000);
+        }
+    });
 })();
 </script>
 {% endblock %}
