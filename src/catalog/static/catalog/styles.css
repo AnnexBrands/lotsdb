@@ -228,6 +228,21 @@ tbody tr:hover { background: #f8fafc; }
 .mobile-back-btn { display: none; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.8rem; color: #475569; cursor: pointer; position: fixed; top: 60px; left: 0.5rem; z-index: 20; }
 .mobile-back-btn:hover { background: #e2e8f0; }
 
+/* === Modal === */
+dialog#lot-modal { max-width: 700px; width: 90vw; max-height: 85vh; border-radius: 8px; border: none; padding: 0; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+dialog#lot-modal::backdrop { background: rgba(0,0,0,0.5); }
+.modal-container { display: flex; flex-direction: column; max-height: 85vh; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+.modal-header h2 { font-size: 1.1rem; margin: 0; }
+.modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b; padding: 0.25rem; line-height: 1; }
+.modal-close:hover { color: #1e293b; }
+.modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
+.modal-loading { display: flex; align-items: center; justify-content: center; padding: 3rem; }
+.modal-body .lot-data { box-shadow: none; margin-bottom: 1rem; padding: 0; }
+.modal-body .lot-data:last-child { margin-bottom: 0; }
+.modal-body .detail-header { box-shadow: none; padding: 0; margin-bottom: 1rem; }
+.modal-body .override-form { box-shadow: none; padding: 0; }
+
 /* === Mobile/Narrow Viewport === */
 @media (max-width: 767px) {
     .shell { grid-template-columns: 1fr; }

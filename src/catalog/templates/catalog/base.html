@@ -48,7 +48,7 @@
         var fileInput = document.getElementById('dropzone-input');
         var uploading = false;
 
-        function showToast(msg, type) {
+        window.showToast = function(msg, type) {
             var container = document.getElementById('toast-container');
             var el = document.createElement('div');
             el.className = 'toast toast-' + type;

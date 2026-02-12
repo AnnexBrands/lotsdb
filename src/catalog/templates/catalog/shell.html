@@ -42,6 +42,17 @@
     </div>
     <div id="panel-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 </div>
+<dialog id="lot-modal" aria-labelledby="lot-modal-title">
+    <div class="modal-container">
+        <div class="modal-header">
+            <h2 id="lot-modal-title">Lot Detail</h2>
+            <button class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div id="lot-modal-body" class="modal-body">
+            <div class="modal-loading"><div class="spinner"></div></div>
+        </div>
+    </div>
+</dialog>
 <script>
 (function() {
     var shell = document.querySelector('.shell');
@@ -88,6 +99,64 @@
             shell.setAttribute('data-mobile-panel', 'sellers');
         }
     });
+
+    // --- Modal logic ---
+    var dialog = document.getElementById('lot-modal');
+    var modalBody = document.getElementById('lot-modal-body');
+    var modalTitle = document.getElementById('lot-modal-title');
+    var loadingHTML = '<div class="modal-loading"><div class="spinner"></div></div>';
+
+    if (dialog) {
+        // Close button
+        dialog.querySelector('.modal-close').addEventListener('click', function() {
+            dialog.close();
+        });
+
+        // Backdrop click (click on dialog element itself, not children)
+        dialog.addEventListener('click', function(e) {
+            if (e.target === dialog) dialog.close();
+        });
+
+        // Open modal after HTMX swaps content into modal body
+        document.body.addEventListener('htmx:afterSwap', function(e) {
+            if (e.detail.target === modalBody || e.detail.target.id === 'lot-modal-body') {
+                // Update title from data attribute
+                var firstChild = modalBody.firstElementChild;
+                if (firstChild && firstChild.getAttribute('data-lot-title')) {
+                    modalTitle.textContent = firstChild.getAttribute('data-lot-title');
+                }
+                if (!dialog.open) dialog.showModal();
+            }
+        });
+
+        // Close modal on closeModal HX-Trigger event
+        document.body.addEventListener('closeModal', function() {
+            dialog.close();
+        });
+
+        // Show toast on showToast HX-Trigger event
+        document.body.addEventListener('showToast', function(e) {
+            var d = e.detail;
+            if (d && d.message && window.showToast) {
+                window.showToast(d.message, d.type || 'success');
+            }
+        });
+
+        // Reset modal body to loading spinner when dialog closes
+        dialog.addEventListener('close', function() {
+            modalBody.innerHTML = loadingHTML;
+            modalTitle.textContent = 'Lot Detail';
+        });
+
+        // Before HTMX sends request targeting modal body, show loading spinner
+        document.body.addEventListener('htmx:beforeRequest', function(e) {
+            var target = e.detail.target;
+            if (target === modalBody || (target && target.id === 'lot-modal-body')) {
+                modalBody.innerHTML = loadingHTML;
+                if (!dialog.open) dialog.showModal();
+            }
+        });
+    }
 })();
 </script>
 {% endblock %}

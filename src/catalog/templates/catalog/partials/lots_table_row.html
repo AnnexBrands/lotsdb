@@ -1,5 +1,5 @@
-<tr hx-post="/panels/lots/{{ row.lot.id }}/override/" hx-target="closest tr" hx-swap="outerHTML" hx-indicator="closest tr">
-    <td class="lot-thumb-cell">
+<tr id="lot-row-{{ row.lot.id }}" hx-post="/panels/lots/{{ row.lot.id }}/override/" hx-target="closest tr" hx-swap="outerHTML" hx-indicator="closest tr">
+    <td class="lot-thumb-cell" hx-get="/panels/lots/{{ row.lot.id }}/detail/" hx-target="#lot-modal-body" hx-swap="innerHTML" style="cursor: pointer;">
         {% if row.lot.image_links %}
         <img class="lot-thumb" src="{{ row.lot.image_links.0.link }}" alt="">
         {% else %}
