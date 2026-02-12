@@ -1,7 +1,6 @@
 import json
 import logging
 
-from django.http import HttpResponse
 from django.shortcuts import render
 
 from ABConnect.exceptions import ABConnectError
@@ -272,16 +271,10 @@ def lot_detail_panel(request, lot_id):
                 services.save_lot_override(request, lot_id, override_data)
                 lot = services.get_lot(request, lot_id)
                 lot_rows = build_lot_table_rows([lot])
-                oob_row = render(request, "catalog/partials/lots_table_row.html", {
+                response = render(request, "catalog/partials/lots_table_row.html", {
                     "row": lot_rows[0],
-                }).content.decode()
-                # Wrap with OOB swap attribute
-                oob_html = oob_row.replace(
-                    f'<tr id="lot-row-{lot_id}"',
-                    f'<tr id="lot-row-{lot_id}" hx-swap-oob="outerHTML"',
-                    1,
-                )
-                response = HttpResponse(oob_html, content_type="text/html")
+                    "oob": True,
+                })
                 response["HX-Trigger"] = json.dumps({
                     "closeModal": True,
                     "showToast": {"message": "Override saved", "type": "success"},
