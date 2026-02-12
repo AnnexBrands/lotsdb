@@ -4,6 +4,7 @@ from django.shortcuts import render
 
 from ABConnect.exceptions import ABConnectError
 from catalog import services
+from catalog.views.panels import build_lot_table_rows
 
 logger = logging.getLogger(__name__)
 
@@ -95,14 +96,17 @@ def seller_list(request):
                                 event_seller_ids = [s.id for s in (event.sellers or [])]
                                 if selected_seller_id in event_seller_ids:
                                     context["selected_event_id"] = event_internal_id
-                                    # Use embedded lots from expanded catalog (reliable)
-                                    # instead of list_lots_by_catalog endpoint.
-                                    all_lots = event.lots or []
-                                    page_lots = all_lots[:50]
-                                    total = len(all_lots)
-                                    total_pages = max(1, (total + 49) // 50)
+                                    # Paginate embedded lots and fetch full LotDto
+                                    all_lot_refs = event.lots or []
+                                    page_lot_refs = all_lot_refs[:25]
+                                    total = len(all_lot_refs)
+                                    total_pages = max(1, (total + 24) // 25)
+                                    lot_ids = [ref.id for ref in page_lot_refs]
+                                    full_lots = services.get_lots_for_event(request, lot_ids)
+                                    lot_rows = build_lot_table_rows(full_lots)
                                     context["hydrate_event"] = event
-                                    context["hydrate_lots"] = page_lots
+                                    context["hydrate_lots"] = page_lot_refs
+                                    context["hydrate_lot_rows"] = lot_rows
                                     context["hydrate_lots_paginated"] = {
                                         "page_number": 1,
                                         "total_pages": total_pages,

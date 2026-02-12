@@ -73,6 +73,14 @@ def get_lot(request, lot_id):
     return api.lots.get(lot_id)
 
 
+def get_lots_for_event(request, lot_ids):
+    """Fetch full LotDto for each lot ID. No batch API available."""
+    results = []
+    for lot_id in lot_ids:
+        results.append(get_lot(request, lot_id))
+    return results
+
+
 def save_lot_override(request, lot_id, override_data):
     """Update a lot's overriden_data with new override values."""
     from ABConnect.api.models.catalog import UpdateLotRequest, LotDataDto

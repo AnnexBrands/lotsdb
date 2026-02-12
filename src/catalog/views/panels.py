@@ -21,6 +21,50 @@ def _parse_page_params(request, default_page_size=50):
     return page, page_size
 
 
+_LOT_TABLE_FIELDS = [
+    ("description", False),
+    ("notes", False),
+    ("qty", False),
+    ("l", False),
+    ("w", False),
+    ("h", False),
+    ("wgt", False),
+    ("cpack", False),
+    ("force_crate", True),
+    ("do_not_tip", True),
+]
+
+
+def build_lot_table_rows(lots):
+    """Build LotTableRow dicts with per-field override comparison."""
+    rows = []
+    for lot in lots:
+        initial = lot.initial_data
+        override = lot.overriden_data[0] if lot.overriden_data else None
+
+        fields = {}
+        for attr, is_flag in _LOT_TABLE_FIELDS:
+            init_val = getattr(initial, attr, None) if initial else None
+            over_val = getattr(override, attr, None) if override else None
+            changed = override is not None and over_val != init_val
+            fields[attr] = {
+                "value": over_val if override and over_val is not None else init_val,
+                "changed": changed,
+                "original": init_val,
+            }
+
+        lot_number = ""
+        if lot.catalogs:
+            lot_number = getattr(lot.catalogs[0], "lot_number", "")
+
+        rows.append({
+            "lot": lot,
+            "lot_number": lot_number,
+            "fields": fields,
+        })
+    return rows
+
+
 def _parse_int_or_none(value):
     """Parse a string to int, returning None on failure."""
     if value is None:
@@ -119,14 +163,17 @@ def _paginate_locally(items, page, page_size):
 
 
 def event_lots_panel(request, event_id):
-    """Return HTML fragment: lots cards for Main panel + OOB events list with selection."""
-    page, page_size = _parse_page_params(request)
+    """Return HTML fragment: lots table for Main panel + OOB events list with selection."""
+    page, page_size = _parse_page_params(request, default_page_size=25)
 
     try:
         event = services.get_catalog(request, event_id)
-        # Use embedded lots from the expanded catalog response (reliable)
-        # instead of list_lots_by_catalog which is unreliable for event scoping.
-        page_lots, paginated = _paginate_locally(event.lots or [], page, page_size)
+        # Paginate embedded lots (LotCatalogInformationDto: id + lot_number only)
+        page_lot_refs, paginated = _paginate_locally(event.lots or [], page, page_size)
+        # Fetch full LotDto for each lot in the page
+        lot_ids = [ref.id for ref in page_lot_refs]
+        full_lots = services.get_lots_for_event(request, lot_ids)
+        lot_rows = build_lot_table_rows(full_lots)
         # Resolve seller from event data for OOB re-render and URL push
         seller_id = event.sellers[0].id if event.sellers else None
         if seller_id:
@@ -143,7 +190,8 @@ def event_lots_panel(request, event_id):
 
     context = {
         "event": event,
-        "lots": page_lots,
+        "lots": page_lot_refs,
+        "lot_rows": lot_rows,
         "paginated": paginated,
         "event_id": event_id,
         "seller_id": seller_id,
@@ -162,3 +210,43 @@ def event_lots_panel(request, event_id):
         seller_display_id = event.sellers[0].customer_display_id
         response["HX-Push-Url"] = f"/?seller={seller_display_id}&event={event.customer_catalog_id}"
     return response
+
+
+def lot_override_panel(request, lot_id):
+    """Handle POST to save inline override for a single lot row, return updated <tr>."""
+    if request.method != "POST":
+        return render(request, "catalog/partials/panel_error.html", {
+            "error_message": "Method not allowed",
+            "retry_url": "/",
+            "retry_target": "#panel-main-content",
+        }, status=405)
+
+    override_data = {}
+    for field in ("qty", "l", "w", "h", "wgt"):
+        val = request.POST.get(field, "").strip()
+        if val:
+            try:
+                override_data[field] = float(val) if "." in val else int(val)
+            except (ValueError, TypeError):
+                pass
+    for field in ("description", "notes", "cpack"):
+        val = request.POST.get(field, "").strip()
+        if val:
+            override_data[field] = val
+    for field in ("force_crate", "do_not_tip"):
+        override_data[field] = field in request.POST
+
+    try:
+        services.save_lot_override(request, lot_id, override_data)
+        lot = services.get_lot(request, lot_id)
+        lot_rows = build_lot_table_rows([lot])
+        return render(request, "catalog/partials/lots_table_row.html", {
+            "row": lot_rows[0],
+        })
+    except ABConnectError:
+        logger.exception("Failed to save override for lot %s", lot_id)
+        return render(request, "catalog/partials/panel_error.html", {
+            "error_message": "Could not save override",
+            "retry_url": "/",
+            "retry_target": "#panel-main-content",
+        })

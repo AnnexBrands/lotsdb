@@ -1,28 +1,8 @@
 <div class="panel-header">
     <h3>{{ event.title|default:"Lots" }}<span class="panel-count">({{ paginated.total_items }})</span></h3>
 </div>
-{% if lots %}
-<ul class="lot-cards">
-    {% for lot in lots %}
-    <li class="lot-card">
-        <a href="/lots/{{ lot.id }}/" class="lot-card-link">
-            <div class="lot-card-thumb">
-                {% if lot.image_links %}
-                <img src="{{ lot.image_links.0.link }}" alt="">
-                {% else %}
-                <div class="lot-card-no-img"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>
-                {% endif %}
-            </div>
-            <div class="lot-card-info">
-                <span class="lot-card-title">{{ lot.lot_number|default:"—" }}{% if lot.initial_data.description %}: {{ lot.initial_data.description }}{% endif %}</span>
-                {% if lot.initial_data.notes %}
-                <span class="lot-card-notes">{{ lot.initial_data.notes|truncatewords:30 }}{% if lot.initial_data.notes|length > 120 %} <span class="lot-card-more">[more]</span>{% endif %}</span>
-                {% endif %}
-            </div>
-        </a>
-    </li>
-    {% endfor %}
-</ul>
+{% if lot_rows %}
+{% include "catalog/partials/lots_table.html" with lot_rows=lot_rows %}
 {% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-main-content" indicator_id="#panel-main .htmx-indicator" %}
 {% else %}
 <div class="panel-empty">
@@ -33,6 +13,6 @@
 
 {% if oob_events is not None %}
 <div id="panel-left2-content" hx-swap-oob="innerHTML">
-    {% include "catalog/partials/events_panel.html" with events=oob_events paginated=oob_events_paginated seller_id=oob_seller_id pagination_url=oob_events_pagination_url selected_event_id=selected_event_id oob_sellers=None %}
+    {% include "catalog/partials/events_panel.html" with events=oob_events paginated=oob_events_paginated seller_id=oob_seller_id pagination_url=oob_events_pagination_url selected_event_id=selected_event_id oob_sellers=None skip_main_oob=True %}
 </div>
 {% endif %}

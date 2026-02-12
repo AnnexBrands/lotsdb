@@ -4,7 +4,7 @@ from unittest.mock import patch
 import pytest
 from django.test import RequestFactory
 
-from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_panel
+from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_panel, lot_override_panel
 from catalog.views.sellers import seller_list
 from conftest import AUTH_SESSION
 
@@ -36,13 +36,20 @@ def _mock_event(id=1, title="Test Event", customer_catalog_id="CAT001", agent="A
 
 
 def _mock_lot(id=1, lot_number="L001", customer_item_id="ITEM001",
-              description=None, notes=None, image_links=None):
-    initial_data = SimpleNamespace(description=description, notes=notes)
+              description=None, notes=None, image_links=None,
+              qty=None, l=None, w=None, h=None, wgt=None, cpack=None,
+              force_crate=None, do_not_tip=None, overriden_data=None):
+    initial_data = SimpleNamespace(
+        description=description, notes=notes, qty=qty,
+        l=l, w=w, h=h, wgt=wgt, cpack=cpack,
+        force_crate=force_crate, do_not_tip=do_not_tip,
+    )
     catalogs = [SimpleNamespace(catalog_id=1, lot_number=lot_number)]
     return SimpleNamespace(
         id=id, lot_number=lot_number, customer_item_id=customer_item_id,
         initial_data=initial_data, catalogs=catalogs,
         image_links=image_links if image_links is not None else [],
+        overriden_data=overriden_data if overriden_data is not None else [],
     )
 
 
@@ -56,6 +63,11 @@ def _mock_paginated(items, total_items=None, page_number=1, total_pages=1,
         has_previous_page=has_previous_page,
         has_next_page=has_next_page,
     )
+
+
+def _lots_for_event_side_effect(request, lot_ids):
+    """Generate full mock lots for any list of lot IDs."""
+    return [_mock_lot(id=lid, lot_number=f"L{lid:03d}") for lid in lot_ids]
 
 
 class TestSellersPanelContract:
@@ -169,9 +181,12 @@ class TestSellerEventsPanelContract:
 class TestEventLotsPanelContract:
     """Contract tests for GET /panels/events/{id}/lots/ — HTML fragment endpoint."""
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_returns_html_fragment(self, mock_catalog, factory):
-        mock_catalog.return_value = _mock_event(lots=[_mock_lot()])
+    def test_returns_html_fragment(self, mock_catalog, mock_get_lots, factory):
+        lot = _mock_lot()
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -180,32 +195,37 @@ class TestEventLotsPanelContract:
         assert "<html" not in content
         assert response.status_code == 200
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_contains_lot_card_structure(self, mock_catalog, factory):
-        mock_catalog.return_value = _mock_event(lots=[
-            _mock_lot(id=55, lot_number="L100", description="Test item"),
-        ])
+    def test_contains_lot_table_structure(self, mock_catalog, mock_get_lots, factory):
+        lot = _mock_lot(id=55, lot_number="L100", description="Test item")
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        assert "lot-card" in content
-        assert "L100" in content
+        assert "lots-table" in content
+        assert 'hx-post="/panels/lots/55/override/"' in content
         assert "Test item" in content
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_lot_links_use_standard_href(self, mock_catalog, factory):
-        mock_catalog.return_value = _mock_event(lots=[_mock_lot(id=77)])
+    def test_lot_rows_have_hx_post_for_override(self, mock_catalog, mock_get_lots, factory):
+        lot = _mock_lot(id=77)
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        assert 'href="/lots/77/"' in content
-        assert "hx-get" not in content.split("lot-cards")[1].split("</ul>")[0]
+        assert 'hx-post="/panels/lots/77/override/"' in content
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_empty_state_when_no_lots(self, mock_catalog, factory):
+    def test_empty_state_when_no_lots(self, mock_catalog, mock_get_lots, factory):
         mock_catalog.return_value = _mock_event(lots=[])
+        mock_get_lots.return_value = []
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -283,11 +303,13 @@ class TestPaginationContract:
         assert "panel-pagination" in content
         assert 'hx-target="#panel-left2-content"' in content
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_lots_panel_pagination_targets_main(self, mock_catalog, factory):
-        # 51 lots at page_size=50 produces 2 pages
+    def test_lots_panel_pagination_targets_main(self, mock_catalog, mock_get_lots, factory):
+        # 51 lots at page_size=25 produces 3 pages
         lots = [_mock_lot(id=i, lot_number=f"L{i:03d}") for i in range(51)]
         mock_catalog.return_value = _mock_event(lots=lots)
+        mock_get_lots.side_effect = _lots_for_event_side_effect
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -295,18 +317,21 @@ class TestPaginationContract:
         assert "panel-pagination" in content
         assert 'hx-target="#panel-main-content"' in content
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_lots_panel_page2_shows_correct_slice(self, mock_catalog, factory):
-        # 51 lots: page 1 = lots 0-49, page 2 = lot 50
+    def test_lots_panel_page2_shows_correct_slice(self, mock_catalog, mock_get_lots, factory):
+        # 51 lots at page_size=25: page 1 = lots 0-24, page 2 = lots 25-49, page 3 = lot 50
         lots = [_mock_lot(id=i, lot_number=f"L{i:03d}") for i in range(51)]
         mock_catalog.return_value = _mock_event(lots=lots)
+        mock_get_lots.side_effect = _lots_for_event_side_effect
         request = _make_get(factory, "/panels/events/1/lots/", {"page": "2"})
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        assert "L050" in content
+        # Page 2 lots (ids 25-49) should be present via hx-post URLs
+        assert 'hx-post="/panels/lots/25/override/"' in content
         # Page 1 lots should NOT be present
-        assert "L000" not in content
+        assert 'hx-post="/panels/lots/0/override/"' not in content
 
 
 class TestSellerSelectionContract:
@@ -356,21 +381,24 @@ class TestSellerSelectionContract:
 class TestEventSelectionContract:
     """Contract tests for event selection highlighting (FR-102)."""
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.list_catalogs")
     @patch("catalog.views.panels.services.get_catalog")
     def test_lots_response_includes_oob_events_list_with_active(
-        self, mock_catalog, mock_catalogs, factory
+        self, mock_catalog, mock_catalogs, mock_get_lots, factory
     ):
         """GET /panels/events/{id}/lots/ includes OOB #panel-left2-content with .active."""
+        lot = _mock_lot()
         mock_catalog.return_value = _mock_event(
             id=7, customer_catalog_id="CAT001",
             sellers=[_mock_seller(id=42)],
-            lots=[_mock_lot()],
+            lots=[lot],
         )
         mock_catalogs.return_value = _mock_paginated([
             _mock_event(id=7, title="Selected Event"),
             _mock_event(id=8, title="Other Event"),
         ])
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/panels/events/7/lots/")
         response = event_lots_panel(request, event_id=7)
 
@@ -398,16 +426,19 @@ class TestUrlPushContract:
 
         assert response["HX-Push-Url"] == "/?seller=4098"
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.list_catalogs")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_event_lots_pushes_customer_ids(self, mock_catalog, mock_catalogs, factory):
+    def test_event_lots_pushes_customer_ids(self, mock_catalog, mock_catalogs, mock_get_lots, factory):
         """GET /panels/events/{id}/lots/ HX-Push-Url uses customer_display_id and customer_catalog_id (T015)."""
+        lot = _mock_lot()
         mock_catalog.return_value = _mock_event(
             id=7, customer_catalog_id="395768",
             sellers=[_mock_seller(id=42, customer_display_id=4098)],
-            lots=[_mock_lot()],
+            lots=[lot],
         )
         mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/panels/events/7/lots/")
         response = event_lots_panel(request, event_id=7)
 
@@ -437,15 +468,17 @@ class TestShellHydrationContract:
         assert "Event A" in content
         assert 'class="panel-item active"' in content
 
+    @patch("catalog.views.sellers.services.get_lots_for_event")
     @patch("catalog.views.sellers.services.get_catalog")
     @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
     @patch("catalog.views.sellers.services.list_catalogs")
     @patch("catalog.views.sellers.services.find_seller_by_display_id")
     @patch("catalog.views.sellers.services.list_sellers")
     def test_shell_with_display_id_and_catalog_id_renders_lots(
-        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, factory
+        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, mock_get_lots, factory
     ):
         """GET /?seller=4098&event=395768 resolves both and renders lots (T016)."""
+        lot = _mock_lot(id=1, lot_number="L001", description="Test Lot")
         mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
         mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
         mock_catalogs.return_value = _mock_paginated([
@@ -456,8 +489,9 @@ class TestShellHydrationContract:
         mock_catalog.return_value = _mock_event(
             id=7, customer_catalog_id="395768",
             sellers=[_mock_seller(id=42, customer_display_id=4098)],
-            lots=[_mock_lot(id=1, lot_number="L001", description="Test Lot")],
+            lots=[lot],
         )
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/", {"seller": "4098", "event": "395768"})
         response = seller_list(request)
 
@@ -578,15 +612,17 @@ class TestPaginationValidationContract:
 class TestHydratedPaginationUrlContract:
     """Contract tests for hydrated panel pagination URLs (T002)."""
 
+    @patch("catalog.views.sellers.services.get_lots_for_event")
     @patch("catalog.views.sellers.services.get_catalog")
     @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
     @patch("catalog.views.sellers.services.list_catalogs")
     @patch("catalog.views.sellers.services.find_seller_by_display_id")
     @patch("catalog.views.sellers.services.list_sellers")
     def test_hydrated_events_panel_has_valid_pagination_url(
-        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, factory
+        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, mock_get_lots, factory
     ):
         """Hydrated events panel contains hx-get pagination URL starting with /panels/sellers/."""
+        lot = _mock_lot()
         mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
         mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
         mock_catalogs.return_value = _mock_paginated(
@@ -596,33 +632,36 @@ class TestHydratedPaginationUrlContract:
         mock_find_catalog.return_value = 7
         mock_catalog.return_value = _mock_event(
             id=7, sellers=[_mock_seller(id=42)],
-            lots=[_mock_lot()],
+            lots=[lot],
         )
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/", {"seller": "4098", "event": "CAT001"})
         response = seller_list(request)
 
         content = response.content.decode()
         assert 'hx-get="/panels/sellers/42/events/' in content
 
+    @patch("catalog.views.sellers.services.get_lots_for_event")
     @patch("catalog.views.sellers.services.get_catalog")
     @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
     @patch("catalog.views.sellers.services.list_catalogs")
     @patch("catalog.views.sellers.services.find_seller_by_display_id")
     @patch("catalog.views.sellers.services.list_sellers")
     def test_hydrated_lots_panel_has_valid_pagination_url(
-        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, factory
+        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, mock_get_lots, factory
     ):
         """Hydrated lots panel contains hx-get pagination URL starting with /panels/events/."""
         mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
         mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
         mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
         mock_find_catalog.return_value = 7
-        # 51 lots at page_size=50 produces 2 pages of local pagination
+        # 51 lots at page_size=25 produces 3 pages of local pagination
         lots = [_mock_lot(id=i, lot_number=f"L{i:03d}") for i in range(51)]
         mock_catalog.return_value = _mock_event(
             id=7, sellers=[_mock_seller(id=42)],
             lots=lots,
         )
+        mock_get_lots.side_effect = _lots_for_event_side_effect
         request = _make_get(factory, "/", {"seller": "4098", "event": "CAT001"})
         response = seller_list(request)
 
@@ -713,42 +752,209 @@ class TestEmptyStateContract:
 class TestLotsDataContract:
     """Contract tests for lots panel data source (US2 - T014: embedded lots)."""
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.list_catalogs")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_event_lots_uses_embedded_lots(self, mock_catalog, mock_catalogs, factory):
+    def test_event_lots_uses_embedded_lots(self, mock_catalog, mock_catalogs, mock_get_lots, factory):
         """event_lots_panel renders lots from event.lots (embedded catalog data)."""
+        lots = [
+            _mock_lot(id=10, lot_number="L010"),
+            _mock_lot(id=11, lot_number="L011"),
+        ]
         mock_catalog.return_value = _mock_event(
             id=7, customer_catalog_id="CAT001",
             sellers=[_mock_seller(id=42)],
-            lots=[
-                _mock_lot(id=10, lot_number="L010"),
-                _mock_lot(id=11, lot_number="L011"),
-            ],
+            lots=lots,
         )
         mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        mock_get_lots.return_value = lots
         request = _make_get(factory, "/panels/events/7/lots/")
         response = event_lots_panel(request, event_id=7)
 
         content = response.content.decode()
         assert response.status_code == 200
-        assert "L010" in content
-        assert "L011" in content
+        # Lot IDs appear in hx-post override URLs
+        assert 'hx-post="/panels/lots/10/override/"' in content
+        assert 'hx-post="/panels/lots/11/override/"' in content
 
+    @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.list_catalogs")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_event_lots_does_not_call_list_lots_by_catalog(self, mock_catalog, mock_catalogs, mock_lots, factory):
+    def test_event_lots_does_not_call_list_lots_by_catalog(self, mock_catalog, mock_catalogs, mock_lots, mock_get_lots, factory):
         """event_lots_panel must NOT call list_lots_by_catalog (AC-8)."""
+        lot = _mock_lot()
         mock_catalog.return_value = _mock_event(
             id=7, customer_catalog_id="CAT001",
             sellers=[_mock_seller(id=42)],
-            lots=[_mock_lot()],
+            lots=[lot],
         )
         mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        mock_get_lots.return_value = [lot]
         request = _make_get(factory, "/panels/events/7/lots/")
         event_lots_panel(request, event_id=7)
 
         mock_lots.assert_not_called()
+
+
+class TestOobBugFixContract:
+    """Contract tests for OOB bug fix: lots panel must not overwrite main content (US1)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_lots_panel_oob_does_not_contain_main_clear(self, mock_catalog, mock_catalogs, mock_get_lots, factory):
+        """event_lots_panel response must NOT contain a second panel-main-content OOB div (T006)."""
+        lot = _mock_lot()
+        mock_catalog.return_value = _mock_event(
+            id=7, customer_catalog_id="CAT001",
+            sellers=[_mock_seller(id=42)],
+            lots=[lot],
+        )
+        mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/7/lots/")
+        response = event_lots_panel(request, event_id=7)
+
+        content = response.content.decode()
+        # The lots panel response should NOT contain an OOB div that would clear main content
+        assert content.count('id="panel-main-content"') == 0
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    def test_events_panel_still_clears_main(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """seller_events_panel response must still contain panel-main-content OOB with empty state (T007)."""
+        mock_seller.return_value = _mock_seller()
+        mock_catalogs.return_value = _mock_paginated([_mock_event()])
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        assert 'id="panel-main-content"' in content
+        assert "Select an event to view lots" in content
+
+
+class TestLotsTableLayoutContract:
+    """Contract tests for lots table layout (T017)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_lots_panel_renders_table_with_columns(self, mock_catalog, mock_get_lots, factory):
+        """Lots panel renders <table class='lots-table'> with all column headers (T017)."""
+        lot = _mock_lot(id=1, description="Test", qty=5, l=10, w=8, h=6, wgt=100, cpack="A1")
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        assert '<table class="lots-table">' in content
+        for header in ["Img", "Desc/Notes", "Qty", "L", "W", "H", "Wgt", "CPack", "Crate", "DNT", "Save"]:
+            assert f"<th>{header}</th>" in content
+
+
+class TestLotsThumbnailContract:
+    """Contract tests for lot thumbnails in lots panel (T011)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_lots_panel_contains_thumbnail(self, mock_catalog, mock_get_lots, factory):
+        """Lots panel HTML contains <img> tag with lot image URL when lot has image_links (T011)."""
+        img = SimpleNamespace(link="https://example.com/img/lot1.jpg")
+        lot = _mock_lot(id=1, image_links=[img], description="Has Image")
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        assert "<img" in content
+        assert "https://example.com/img/lot1.jpg" in content
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_lots_panel_shows_placeholder_when_no_image(self, mock_catalog, mock_get_lots, factory):
+        """Lots panel shows placeholder SVG when lot has no image_links."""
+        lot = _mock_lot(id=1, image_links=[])
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        assert "lot-thumb-placeholder" in content
+
+
+class TestLotsDescriptionContract:
+    """Contract tests for lot descriptions in lots panel (T012)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_lots_panel_contains_description(self, mock_catalog, mock_get_lots, factory):
+        """Lots panel HTML contains description text from initial_data.description (T012)."""
+        lot = _mock_lot(id=1, description="Antique wooden desk", notes="Minor scratches")
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        assert "Antique wooden desk" in content
+        assert "Minor scratches" in content
+
+
+class TestOverrideCellsContract:
+    """Contract tests for override display in lots table (T024)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_override_cells_have_class_and_tooltip(self, mock_catalog, mock_get_lots, factory):
+        """Overridden cells have class='overridden' and title='Original: ...' (T024)."""
+        override = SimpleNamespace(
+            description="Changed desc", notes=None, qty=10, l=None, w=None,
+            h=None, wgt=None, cpack=None, force_crate=None, do_not_tip=None,
+        )
+        lot = _mock_lot(id=1, description="Original desc", qty=5, overriden_data=[override])
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        assert 'class="overridden"' in content
+        assert 'title="Original: 5"' in content
+
+
+class TestLotOverridePanelContract:
+    """Contract tests for POST /panels/lots/{id}/override/ (T025)."""
+
+    @patch("catalog.views.panels.services.get_lot")
+    @patch("catalog.views.panels.services.save_lot_override")
+    def test_lot_override_panel_saves_and_returns_row(self, mock_save, mock_get_lot, factory):
+        """POST form data to lot_override_panel calls save_lot_override and returns <tr> (T025)."""
+        saved_lot = _mock_lot(id=42, description="Updated", qty=99)
+        mock_save.return_value = None
+        mock_get_lot.return_value = saved_lot
+
+        request = factory.post("/panels/lots/42/override/", {
+            "qty": "99",
+            "description": "Updated",
+            "force_crate": "on",
+        })
+        request.session = AUTH_SESSION.copy()
+        response = lot_override_panel(request, lot_id=42)
+
+        content = response.content.decode()
+        assert response.status_code == 200
+        assert "<tr" in content
+        mock_save.assert_called_once()
+        call_args = mock_save.call_args
+        assert call_args[0][1] == 42  # lot_id
+        assert call_args[0][2]["qty"] == 99
+        assert call_args[0][2]["description"] == "Updated"
+        assert call_args[0][2]["force_crate"] is True
 
 
 class TestIndicatorWiringContract:
