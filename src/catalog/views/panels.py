@@ -102,15 +102,31 @@ def seller_events_panel(request, seller_id):
     return response
 
 
+def _paginate_locally(items, page, page_size):
+    """Paginate an in-memory list and return (page_items, paginated_metadata)."""
+    total = len(items)
+    start = (page - 1) * page_size
+    page_items = items[start:start + page_size]
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    paginated = {
+        "page_number": page,
+        "total_pages": total_pages,
+        "total_items": total,
+        "has_previous_page": page > 1,
+        "has_next_page": page < total_pages,
+    }
+    return page_items, paginated
+
+
 def event_lots_panel(request, event_id):
     """Return HTML fragment: lots cards for Main panel + OOB events list with selection."""
     page, page_size = _parse_page_params(request)
 
     try:
         event = services.get_catalog(request, event_id)
-        result = services.list_lots_by_catalog(
-            request, event.customer_catalog_id, page=page, page_size=page_size,
-        )
+        # Use embedded lots from the expanded catalog response (reliable)
+        # instead of list_lots_by_catalog which is unreliable for event scoping.
+        page_lots, paginated = _paginate_locally(event.lots or [], page, page_size)
         # Resolve seller from event data for OOB re-render and URL push
         seller_id = event.sellers[0].id if event.sellers else None
         if seller_id:
@@ -127,8 +143,8 @@ def event_lots_panel(request, event_id):
 
     context = {
         "event": event,
-        "lots": result.items,
-        "paginated": result,
+        "lots": page_lots,
+        "paginated": paginated,
         "event_id": event_id,
         "seller_id": seller_id,
         "pagination_url": f"/panels/events/{event_id}/lots/",

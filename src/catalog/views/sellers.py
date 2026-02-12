@@ -95,12 +95,21 @@ def seller_list(request):
                                 event_seller_ids = [s.id for s in (event.sellers or [])]
                                 if selected_seller_id in event_seller_ids:
                                     context["selected_event_id"] = event_internal_id
-                                    lots_result = services.list_lots_by_catalog(
-                                        request, event.customer_catalog_id, page=1, page_size=50,
-                                    )
+                                    # Use embedded lots from expanded catalog (reliable)
+                                    # instead of list_lots_by_catalog endpoint.
+                                    all_lots = event.lots or []
+                                    page_lots = all_lots[:50]
+                                    total = len(all_lots)
+                                    total_pages = max(1, (total + 49) // 50)
                                     context["hydrate_event"] = event
-                                    context["hydrate_lots"] = lots_result.items
-                                    context["hydrate_lots_paginated"] = lots_result
+                                    context["hydrate_lots"] = page_lots
+                                    context["hydrate_lots_paginated"] = {
+                                        "page_number": 1,
+                                        "total_pages": total_pages,
+                                        "total_items": total,
+                                        "has_previous_page": False,
+                                        "has_next_page": 1 < total_pages,
+                                    }
                                     context["hydrate_lots_pagination_url"] = f"/panels/events/{event_internal_id}/lots/"
                         except ABConnectError:
                             logger.exception("Failed to hydrate event %s", event_catalog_id)
