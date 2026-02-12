@@ -49,8 +49,12 @@ def build_lot_table_rows(lots):
             init_val = getattr(initial, attr, None) if initial else None
             over_val = getattr(override, attr, None) if override else None
             changed = override is not None and over_val != init_val
+            value = over_val if override and over_val is not None else init_val
+            # Normalize cpack to string so template <select> comparisons work
+            if attr == "cpack" and value is not None:
+                value = str(value)
             fields[attr] = {
-                "value": over_val if override and over_val is not None else init_val,
+                "value": value,
                 "changed": changed,
                 "original": init_val,
             }
@@ -340,10 +344,14 @@ def lot_override_panel(request, lot_id):
                 pass
     # Notes is not submitted from the inline row form (only editable via detail modal).
     # Empty/absent values are skipped, so existing notes overrides are preserved.
-    for field in ("description", "notes", "cpack"):
+    for field in ("description", "notes"):
         val = request.POST.get(field, "").strip()
         if val:
             override_data[field] = val
+    # Cpack: allow blank to clear the value (submitted from <select> with empty option)
+    cpack_val = request.POST.get("cpack", "").strip()
+    if "cpack" in request.POST:
+        override_data["cpack"] = cpack_val
     for field in ("force_crate", "do_not_tip"):
         override_data[field] = field in request.POST
 
