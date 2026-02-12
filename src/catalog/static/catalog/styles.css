@@ -118,6 +118,13 @@ tbody tr:hover { background: #f8fafc; }
 .panel-header h3 { font-size: 0.8rem; font-weight: 600; color: #475569; margin: 0; text-transform: uppercase; letter-spacing: 0.03em; }
 .panel-header .panel-count { font-size: 0.75rem; font-weight: 400; color: #94a3b8; margin-left: 0.35rem; text-transform: none; letter-spacing: 0; }
 
+/* === Panel Filter === */
+.panel-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+.panel-filter-input { flex: 1; padding: 0.3rem 0.5rem; border: 1px solid transparent; border-radius: 4px; font-size: 0.75rem; background: transparent; color: #1e293b; min-width: 0; }
+.panel-filter-input:focus { outline: none; border-color: #2563eb; background: #fff; }
+.panel-filter-input::placeholder { color: #94a3b8; font-style: italic; }
+.panel-filter .panel-count { flex-shrink: 0; }
+
 .panel-list { list-style: none; margin: 0; padding: 0; }
 .panel-item { display: block; padding: 0.5rem 0.75rem 0.5rem 1rem; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease; border-left: 3px solid transparent; }
 .panel-item:hover { background: #f1f5f9; }

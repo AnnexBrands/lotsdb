@@ -169,11 +169,9 @@ class TestSellerEventsPanelContract:
 class TestEventLotsPanelContract:
     """Contract tests for GET /panels/events/{id}/lots/ — HTML fragment endpoint."""
 
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_returns_html_fragment(self, mock_catalog, mock_lots, factory):
-        mock_catalog.return_value = _mock_event()
-        mock_lots.return_value = _mock_paginated([_mock_lot()])
+    def test_returns_html_fragment(self, mock_catalog, factory):
+        mock_catalog.return_value = _mock_event(lots=[_mock_lot()])
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -182,11 +180,9 @@ class TestEventLotsPanelContract:
         assert "<html" not in content
         assert response.status_code == 200
 
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_contains_lot_card_structure(self, mock_catalog, mock_lots, factory):
-        mock_catalog.return_value = _mock_event()
-        mock_lots.return_value = _mock_paginated([
+    def test_contains_lot_card_structure(self, mock_catalog, factory):
+        mock_catalog.return_value = _mock_event(lots=[
             _mock_lot(id=55, lot_number="L100", description="Test item"),
         ])
         request = _make_get(factory, "/panels/events/1/lots/")
@@ -197,11 +193,9 @@ class TestEventLotsPanelContract:
         assert "L100" in content
         assert "Test item" in content
 
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_lot_links_use_standard_href(self, mock_catalog, mock_lots, factory):
-        mock_catalog.return_value = _mock_event()
-        mock_lots.return_value = _mock_paginated([_mock_lot(id=77)])
+    def test_lot_links_use_standard_href(self, mock_catalog, factory):
+        mock_catalog.return_value = _mock_event(lots=[_mock_lot(id=77)])
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -209,11 +203,9 @@ class TestEventLotsPanelContract:
         assert 'href="/lots/77/"' in content
         assert "hx-get" not in content.split("lot-cards")[1].split("</ul>")[0]
 
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_empty_state_when_no_lots(self, mock_catalog, mock_lots, factory):
-        mock_catalog.return_value = _mock_event()
-        mock_lots.return_value = _mock_paginated([])
+    def test_empty_state_when_no_lots(self, mock_catalog, factory):
+        mock_catalog.return_value = _mock_event(lots=[])
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -291,14 +283,11 @@ class TestPaginationContract:
         assert "panel-pagination" in content
         assert 'hx-target="#panel-left2-content"' in content
 
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_lots_panel_pagination_targets_main(self, mock_catalog, mock_lots, factory):
-        mock_catalog.return_value = _mock_event()
-        mock_lots.return_value = _mock_paginated(
-            [_mock_lot()], total_items=100, page_number=1,
-            total_pages=2, has_next_page=True,
-        )
+    def test_lots_panel_pagination_targets_main(self, mock_catalog, factory):
+        # 51 lots at page_size=50 produces 2 pages
+        lots = [_mock_lot(id=i, lot_number=f"L{i:03d}") for i in range(51)]
+        mock_catalog.return_value = _mock_event(lots=lots)
         request = _make_get(factory, "/panels/events/1/lots/")
         response = event_lots_panel(request, event_id=1)
 
@@ -306,20 +295,18 @@ class TestPaginationContract:
         assert "panel-pagination" in content
         assert 'hx-target="#panel-main-content"' in content
 
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_lots_panel_page2_called_with_correct_params(self, mock_catalog, mock_lots, factory):
-        mock_catalog.return_value = _mock_event(customer_catalog_id="CAT999")
-        mock_lots.return_value = _mock_paginated(
-            [_mock_lot(id=51, lot_number="L051")], page_number=2,
-            total_pages=2, has_previous_page=True,
-        )
+    def test_lots_panel_page2_shows_correct_slice(self, mock_catalog, factory):
+        # 51 lots: page 1 = lots 0-49, page 2 = lot 50
+        lots = [_mock_lot(id=i, lot_number=f"L{i:03d}") for i in range(51)]
+        mock_catalog.return_value = _mock_event(lots=lots)
         request = _make_get(factory, "/panels/events/1/lots/", {"page": "2"})
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        assert "L051" in content
-        mock_lots.assert_called_once_with(request, "CAT999", page=2, page_size=50)
+        assert "L050" in content
+        # Page 1 lots should NOT be present
+        assert "L000" not in content
 
 
 class TestSellerSelectionContract:
@@ -369,24 +356,21 @@ class TestSellerSelectionContract:
 class TestEventSelectionContract:
     """Contract tests for event selection highlighting (FR-102)."""
 
-    @patch("catalog.views.panels.services.list_sellers")
     @patch("catalog.views.panels.services.list_catalogs")
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
     def test_lots_response_includes_oob_events_list_with_active(
-        self, mock_catalog, mock_lots, mock_catalogs, mock_list_sellers, factory
+        self, mock_catalog, mock_catalogs, factory
     ):
         """GET /panels/events/{id}/lots/ includes OOB #panel-left2-content with .active."""
         mock_catalog.return_value = _mock_event(
             id=7, customer_catalog_id="CAT001",
             sellers=[_mock_seller(id=42)],
+            lots=[_mock_lot()],
         )
-        mock_lots.return_value = _mock_paginated([_mock_lot()])
         mock_catalogs.return_value = _mock_paginated([
             _mock_event(id=7, title="Selected Event"),
             _mock_event(id=8, title="Other Event"),
         ])
-        mock_list_sellers.return_value = _mock_paginated([_mock_seller(id=42)])
         request = _make_get(factory, "/panels/events/7/lots/")
         response = event_lots_panel(request, event_id=7)
 
@@ -399,92 +383,86 @@ class TestEventSelectionContract:
 
 
 class TestUrlPushContract:
-    """Contract tests for HX-Push-Url headers (FR-107, FR-108)."""
+    """Contract tests for HX-Push-Url headers with customer-friendly IDs."""
 
     @patch("catalog.views.panels.services.list_sellers")
     @patch("catalog.views.panels.services.list_catalogs")
     @patch("catalog.views.panels.services.get_seller")
-    def test_seller_events_pushes_seller_url(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
-        """GET /panels/sellers/{id}/events/ has HX-Push-Url: /?seller={id}."""
-        mock_seller.return_value = _mock_seller(id=42)
+    def test_seller_events_pushes_customer_display_id(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """GET /panels/sellers/{id}/events/ HX-Push-Url uses customer_display_id (T015)."""
+        mock_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
         mock_catalogs.return_value = _mock_paginated([_mock_event()])
-        mock_list_sellers.return_value = _mock_paginated([_mock_seller(id=42)])
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
         request = _make_get(factory, "/panels/sellers/42/events/")
         response = seller_events_panel(request, seller_id=42)
 
-        assert response["HX-Push-Url"] == "/?seller=42"
+        assert response["HX-Push-Url"] == "/?seller=4098"
 
     @patch("catalog.views.panels.services.list_catalogs")
-    @patch("catalog.views.panels.services.list_lots_by_catalog")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_event_lots_pushes_seller_and_event_url(self, mock_catalog, mock_lots, mock_catalogs, factory):
-        """GET /panels/events/{id}/lots/ has HX-Push-Url: /?seller={sid}&event={eid}."""
+    def test_event_lots_pushes_customer_ids(self, mock_catalog, mock_catalogs, factory):
+        """GET /panels/events/{id}/lots/ HX-Push-Url uses customer_display_id and customer_catalog_id (T015)."""
         mock_catalog.return_value = _mock_event(
-            id=7, customer_catalog_id="CAT001",
-            sellers=[_mock_seller(id=42)],
+            id=7, customer_catalog_id="395768",
+            sellers=[_mock_seller(id=42, customer_display_id=4098)],
+            lots=[_mock_lot()],
         )
-        mock_lots.return_value = _mock_paginated([_mock_lot()])
         mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
         request = _make_get(factory, "/panels/events/7/lots/")
         response = event_lots_panel(request, event_id=7)
 
-        assert response["HX-Push-Url"] == "/?seller=42&event=7"
+        assert response["HX-Push-Url"] == "/?seller=4098&event=395768"
 
 
 class TestShellHydrationContract:
-    """Contract tests for URL-driven shell hydration (FR-109, FR-110)."""
+    """Contract tests for URL-driven shell hydration with customer-friendly IDs."""
 
     @patch("catalog.views.sellers.services.list_catalogs")
-    @patch("catalog.views.sellers.services.get_seller")
+    @patch("catalog.views.sellers.services.find_seller_by_display_id")
     @patch("catalog.views.sellers.services.list_sellers")
-    def test_shell_with_seller_param_renders_events(self, mock_list, mock_get_seller, mock_catalogs, factory):
-        """GET /?seller=42 renders events in Left2 with seller highlighted."""
+    def test_shell_with_display_id_renders_events(self, mock_list, mock_find_seller, mock_catalogs, factory):
+        """GET /?seller=4098 resolves seller by display_id and renders events (T016)."""
         mock_list.return_value = _mock_paginated([
-            _mock_seller(id=42, name="Selected"),
-            _mock_seller(id=99, name="Other"),
+            _mock_seller(id=42, customer_display_id=4098, name="Selected"),
+            _mock_seller(id=99, customer_display_id=5000, name="Other"),
         ])
-        mock_get_seller.return_value = _mock_seller(id=42, name="Selected")
+        mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098, name="Selected")
         mock_catalogs.return_value = _mock_paginated([
             _mock_event(id=10, title="Event A"),
         ])
-        request = _make_get(factory, "/", {"seller": "42"})
+        request = _make_get(factory, "/", {"seller": "4098"})
         response = seller_list(request)
 
         content = response.content.decode()
-        # Left2 should contain events
         assert "Event A" in content
-        # Seller 42 should be highlighted
         assert 'class="panel-item active"' in content
 
-    @patch("catalog.views.sellers.services.list_lots_by_catalog")
     @patch("catalog.views.sellers.services.get_catalog")
+    @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
     @patch("catalog.views.sellers.services.list_catalogs")
-    @patch("catalog.views.sellers.services.get_seller")
+    @patch("catalog.views.sellers.services.find_seller_by_display_id")
     @patch("catalog.views.sellers.services.list_sellers")
-    def test_shell_with_both_params_renders_events_and_lots(
-        self, mock_list, mock_get_seller, mock_catalogs, mock_catalog, mock_lots, factory
+    def test_shell_with_display_id_and_catalog_id_renders_lots(
+        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, factory
     ):
-        """GET /?seller=42&event=7 renders events + lots with both highlighted."""
-        mock_list.return_value = _mock_paginated([_mock_seller(id=42)])
-        mock_get_seller.return_value = _mock_seller(id=42)
+        """GET /?seller=4098&event=395768 resolves both and renders lots (T016)."""
+        mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
+        mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
         mock_catalogs.return_value = _mock_paginated([
             _mock_event(id=7, title="Selected Event"),
             _mock_event(id=8, title="Other Event"),
         ])
+        mock_find_catalog.return_value = 7
         mock_catalog.return_value = _mock_event(
-            id=7, customer_catalog_id="CAT001",
-            sellers=[_mock_seller(id=42)],
+            id=7, customer_catalog_id="395768",
+            sellers=[_mock_seller(id=42, customer_display_id=4098)],
+            lots=[_mock_lot(id=1, lot_number="L001", description="Test Lot")],
         )
-        mock_lots.return_value = _mock_paginated([
-            _mock_lot(id=1, lot_number="L001", description="Test Lot"),
-        ])
-        request = _make_get(factory, "/", {"seller": "42", "event": "7"})
+        request = _make_get(factory, "/", {"seller": "4098", "event": "395768"})
         response = seller_list(request)
 
         content = response.content.decode()
-        # Main should contain lots
         assert "Test Lot" in content
-        # Events should be present
         assert "Selected Event" in content
 
     @patch("catalog.views.sellers.services.list_sellers")
@@ -496,7 +474,19 @@ class TestShellHydrationContract:
 
         assert response.status_code == 200
         content = response.content.decode()
-        # Should render default empty state, not crash
+        assert "Select a seller to view events" in content
+
+    @patch("catalog.views.sellers.services.find_seller_by_display_id")
+    @patch("catalog.views.sellers.services.list_sellers")
+    def test_shell_with_nonexistent_seller_renders_default(self, mock_list, mock_find_seller, factory):
+        """GET /?seller=99999 (non-existent display_id) renders default empty state."""
+        mock_list.return_value = _mock_paginated([_mock_seller()])
+        mock_find_seller.return_value = None
+        request = _make_get(factory, "/", {"seller": "99999"})
+        response = seller_list(request)
+
+        assert response.status_code == 200
+        content = response.content.decode()
         assert "Select a seller to view events" in content
 
 
@@ -574,3 +564,216 @@ class TestPaginationValidationContract:
 
         assert response.status_code == 200
         mock_list.assert_called_once_with(request, page=1, page_size=200)
+
+    @patch("catalog.views.sellers.services.list_sellers")
+    def test_shell_with_invalid_page_returns_200(self, mock_list, factory):
+        """GET /?page=abc returns 200, not 500 (T002: defensive parsing on shell)."""
+        mock_list.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/", {"page": "abc"})
+        response = seller_list(request)
+
+        assert response.status_code == 200
+
+
+class TestHydratedPaginationUrlContract:
+    """Contract tests for hydrated panel pagination URLs (T002)."""
+
+    @patch("catalog.views.sellers.services.get_catalog")
+    @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
+    @patch("catalog.views.sellers.services.list_catalogs")
+    @patch("catalog.views.sellers.services.find_seller_by_display_id")
+    @patch("catalog.views.sellers.services.list_sellers")
+    def test_hydrated_events_panel_has_valid_pagination_url(
+        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, factory
+    ):
+        """Hydrated events panel contains hx-get pagination URL starting with /panels/sellers/."""
+        mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
+        mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
+        mock_catalogs.return_value = _mock_paginated(
+            [_mock_event()], total_items=100, page_number=1,
+            total_pages=2, has_next_page=True,
+        )
+        mock_find_catalog.return_value = 7
+        mock_catalog.return_value = _mock_event(
+            id=7, sellers=[_mock_seller(id=42)],
+            lots=[_mock_lot()],
+        )
+        request = _make_get(factory, "/", {"seller": "4098", "event": "CAT001"})
+        response = seller_list(request)
+
+        content = response.content.decode()
+        assert 'hx-get="/panels/sellers/42/events/' in content
+
+    @patch("catalog.views.sellers.services.get_catalog")
+    @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
+    @patch("catalog.views.sellers.services.list_catalogs")
+    @patch("catalog.views.sellers.services.find_seller_by_display_id")
+    @patch("catalog.views.sellers.services.list_sellers")
+    def test_hydrated_lots_panel_has_valid_pagination_url(
+        self, mock_list, mock_find_seller, mock_catalogs, mock_find_catalog, mock_catalog, factory
+    ):
+        """Hydrated lots panel contains hx-get pagination URL starting with /panels/events/."""
+        mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
+        mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
+        mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        mock_find_catalog.return_value = 7
+        # 51 lots at page_size=50 produces 2 pages of local pagination
+        lots = [_mock_lot(id=i, lot_number=f"L{i:03d}") for i in range(51)]
+        mock_catalog.return_value = _mock_event(
+            id=7, sellers=[_mock_seller(id=42)],
+            lots=lots,
+        )
+        request = _make_get(factory, "/", {"seller": "4098", "event": "CAT001"})
+        response = seller_list(request)
+
+        content = response.content.decode()
+        assert 'hx-get="/panels/events/7/lots/' in content
+
+    @patch("catalog.views.sellers.services.find_catalog_by_customer_id")
+    @patch("catalog.views.sellers.services.get_catalog")
+    @patch("catalog.views.sellers.services.list_catalogs")
+    @patch("catalog.views.sellers.services.find_seller_by_display_id")
+    @patch("catalog.views.sellers.services.list_sellers")
+    def test_hydration_with_mismatched_seller_event_ignores_event(
+        self, mock_list, mock_find_seller, mock_catalogs, mock_catalog, mock_find_catalog, factory
+    ):
+        """Hydration with mismatched seller/event ignores event, renders seller-only state."""
+        mock_list.return_value = _mock_paginated([_mock_seller(id=42, customer_display_id=4098)])
+        mock_find_seller.return_value = _mock_seller(id=42, customer_display_id=4098)
+        mock_catalogs.return_value = _mock_paginated([_mock_event(id=10)])
+        mock_find_catalog.return_value = 999
+        mock_catalog.return_value = _mock_event(
+            id=999, sellers=[_mock_seller(id=99)],  # Different seller
+        )
+        request = _make_get(factory, "/", {"seller": "4098", "event": "BADCAT"})
+        response = seller_list(request)
+
+        content = response.content.decode()
+        assert "Select an event to view lots" in content
+
+
+class TestPanelFilterContract:
+    """Contract tests for panel header filter inputs (US4 - T023, T024)."""
+
+    @patch("catalog.views.panels.services.list_sellers")
+    def test_sellers_panel_with_name_filter(self, mock_list, factory):
+        """GET /panels/sellers/?name=Test passes Name filter to list_sellers (T023)."""
+        mock_list.return_value = _mock_paginated([_mock_seller(name="Test Seller")])
+        request = _make_get(factory, "/panels/sellers/", {"name": "Test"})
+        response = sellers_panel(request)
+
+        assert response.status_code == 200
+        mock_list.assert_called_once_with(request, page=1, page_size=50, Name="Test")
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    def test_events_panel_with_title_filter(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """GET /panels/sellers/{id}/events/?title=Test passes Title filter to list_catalogs (T023)."""
+        mock_seller.return_value = _mock_seller()
+        mock_catalogs.return_value = _mock_paginated([_mock_event(title="Test Event")])
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/1/events/", {"title": "Test"})
+        response = seller_events_panel(request, seller_id=1)
+
+        assert response.status_code == 200
+        mock_catalogs.assert_called_once_with(request, page=1, page_size=50, seller_id=1, Title="Test")
+
+    @patch("catalog.views.panels.services.list_sellers")
+    def test_sellers_panel_contains_filter_form(self, mock_list, factory):
+        """Seller list panel HTML contains a panel-filter form element (T024)."""
+        mock_list.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/")
+        response = sellers_panel(request)
+
+        content = response.content.decode()
+        assert "panel-filter" in content
+
+
+class TestEmptyStateContract:
+    """Contract tests for contextual empty state messaging (US3 - T021)."""
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    def test_events_panel_oob_main_shows_select_event_message(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """When events panel loads, OOB #panel-main-content shows 'Select an event to view lots'."""
+        mock_seller.return_value = _mock_seller()
+        mock_catalogs.return_value = _mock_paginated([_mock_event()])
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        # OOB main panel clear should have contextual message
+        oob_main = content.split('id="panel-main-content"')[1]
+        assert "Select an event to view lots" in oob_main
+
+
+class TestLotsDataContract:
+    """Contract tests for lots panel data source (US2 - T014: embedded lots)."""
+
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_event_lots_uses_embedded_lots(self, mock_catalog, mock_catalogs, factory):
+        """event_lots_panel renders lots from event.lots (embedded catalog data)."""
+        mock_catalog.return_value = _mock_event(
+            id=7, customer_catalog_id="CAT001",
+            sellers=[_mock_seller(id=42)],
+            lots=[
+                _mock_lot(id=10, lot_number="L010"),
+                _mock_lot(id=11, lot_number="L011"),
+            ],
+        )
+        mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        request = _make_get(factory, "/panels/events/7/lots/")
+        response = event_lots_panel(request, event_id=7)
+
+        content = response.content.decode()
+        assert response.status_code == 200
+        assert "L010" in content
+        assert "L011" in content
+
+    @patch("catalog.views.panels.services.list_lots_by_catalog")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_event_lots_does_not_call_list_lots_by_catalog(self, mock_catalog, mock_catalogs, mock_lots, factory):
+        """event_lots_panel must NOT call list_lots_by_catalog (AC-8)."""
+        mock_catalog.return_value = _mock_event(
+            id=7, customer_catalog_id="CAT001",
+            sellers=[_mock_seller(id=42)],
+            lots=[_mock_lot()],
+        )
+        mock_catalogs.return_value = _mock_paginated([_mock_event(id=7)])
+        request = _make_get(factory, "/panels/events/7/lots/")
+        event_lots_panel(request, event_id=7)
+
+        mock_lots.assert_not_called()
+
+
+class TestIndicatorWiringContract:
+    """Contract tests for hx-indicator attributes on panel items (T003)."""
+
+    @patch("catalog.views.panels.services.list_sellers")
+    def test_seller_items_have_hx_indicator(self, mock_list, factory):
+        """Seller list items should have hx-indicator pointing to Left2 panel."""
+        mock_list.return_value = _mock_paginated([_mock_seller(id=1)])
+        request = _make_get(factory, "/panels/sellers/")
+        response = sellers_panel(request)
+
+        content = response.content.decode()
+        assert 'hx-indicator=' in content
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    def test_event_items_have_hx_indicator(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """Event list items should have hx-indicator pointing to Main panel."""
+        mock_seller.return_value = _mock_seller()
+        mock_catalogs.return_value = _mock_paginated([_mock_event(id=1)])
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        assert 'hx-indicator=' in content
