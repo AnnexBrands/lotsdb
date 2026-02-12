@@ -30,3 +30,9 @@
     <p>No lots in this event</p>
 </div>
 {% endif %}
+
+{% if oob_events is not None %}
+<div id="panel-left2-content" hx-swap-oob="innerHTML">
+    {% include "catalog/partials/events_panel.html" with events=oob_events paginated=oob_events_paginated seller_id=oob_seller_id pagination_url="" selected_event_id=selected_event_id oob_sellers=None %}
+</div>
+{% endif %}

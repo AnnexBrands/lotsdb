@@ -49,10 +49,12 @@ def parse_datetime(value) -> datetime:
 
 
 def ensure_future(dt: datetime) -> datetime:
-    """Ensure datetime is in the future by adding 1 year if needed."""
-    now = datetime.now()
-    if dt <= now:
-        return dt.replace(year=dt.year + 1)
+    """Ensure datetime is in the future; substitute year 2099 if in the past."""
+    if dt <= datetime.now():
+        # Handle leap-day dates: Feb 29 doesn't exist in 2099
+        if dt.month == 2 and dt.day == 29:
+            return dt.replace(year=2099, day=28)
+        return dt.replace(year=2099)
     return dt
 
 
