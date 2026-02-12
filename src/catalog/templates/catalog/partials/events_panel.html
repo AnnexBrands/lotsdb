@@ -1,5 +1,10 @@
 <div class="panel-header">
-    <h3>{{ seller.name|default:"Events" }}<span class="panel-count">({{ paginated.total_items|default:events|length }})</span></h3>
+    <form class="panel-filter" hx-get="/panels/sellers/{{ seller_id }}/events/" hx-target="#panel-left2-content" hx-swap="innerHTML" hx-indicator="#panel-left2 .htmx-indicator">
+        <input type="text" name="title" class="panel-filter-input" value="{{ filter_title }}"
+               placeholder="{% if selected_event_id and selected_event_title %}Selected: {{ selected_event_title }}{% else %}{{ seller.name|default:'Filter events...' }}{% endif %}"
+               autocomplete="off">
+        <span class="panel-count">{{ paginated.total_items }}</span>
+    </form>
 </div>
 {% if events %}
 <ul class="panel-list">
@@ -7,13 +12,14 @@
     <li class="panel-item{% if event.id == selected_event_id %} active{% endif %}"
         hx-get="/panels/events/{{ event.id }}/lots/"
         hx-target="#panel-main-content"
-        hx-swap="innerHTML">
+        hx-swap="innerHTML"
+        hx-indicator="#panel-main .htmx-indicator">
         <span class="panel-item-title">{{ event.title|default:"(untitled)" }}</span>
         <span class="panel-item-meta">{{ event.customer_catalog_id }} | {{ event.start_date|date:"M j, Y" }}</span>
     </li>
     {% endfor %}
 </ul>
-{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-left2-content" %}
+{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-left2-content" indicator_id="#panel-left2 .htmx-indicator" %}
 {% else %}
 <div class="panel-empty">
     <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M10 4v16"/></svg></div>

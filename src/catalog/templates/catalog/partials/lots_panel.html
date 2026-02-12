@@ -14,7 +14,7 @@
                 {% endif %}
             </div>
             <div class="lot-card-info">
-                <span class="lot-card-title">{{ lot.catalogs.0.lot_number|default:"—" }}{% if lot.initial_data.description %}: {{ lot.initial_data.description }}{% endif %}</span>
+                <span class="lot-card-title">{{ lot.lot_number|default:"—" }}{% if lot.initial_data.description %}: {{ lot.initial_data.description }}{% endif %}</span>
                 {% if lot.initial_data.notes %}
                 <span class="lot-card-notes">{{ lot.initial_data.notes|truncatewords:30 }}{% if lot.initial_data.notes|length > 120 %} <span class="lot-card-more">[more]</span>{% endif %}</span>
                 {% endif %}
@@ -23,7 +23,7 @@
     </li>
     {% endfor %}
 </ul>
-{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-main-content" %}
+{% include "catalog/partials/panel_pagination.html" with base_url=pagination_url target_id="#panel-main-content" indicator_id="#panel-main .htmx-indicator" %}
 {% else %}
 <div class="panel-empty">
     <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>
@@ -33,6 +33,6 @@
 
 {% if oob_events is not None %}
 <div id="panel-left2-content" hx-swap-oob="innerHTML">
-    {% include "catalog/partials/events_panel.html" with events=oob_events paginated=oob_events_paginated seller_id=oob_seller_id pagination_url="" selected_event_id=selected_event_id oob_sellers=None %}
+    {% include "catalog/partials/events_panel.html" with events=oob_events paginated=oob_events_paginated seller_id=oob_seller_id pagination_url=oob_events_pagination_url selected_event_id=selected_event_id oob_sellers=None %}
 </div>
 {% endif %}

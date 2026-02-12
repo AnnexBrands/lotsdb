@@ -34,6 +34,15 @@ def get_seller(request, seller_id):
     return api.sellers.get(seller_id)
 
 
+def find_seller_by_display_id(request, display_id):
+    """Look up a seller by customer_display_id and return the seller object, or None."""
+    api = get_catalog_api(request)
+    result = api.sellers.list(page_number=1, page_size=1, CustomerDisplayId=display_id)
+    if result.items:
+        return result.items[0]
+    return None
+
+
 # --- Catalog (Event) service methods ---
 
 
