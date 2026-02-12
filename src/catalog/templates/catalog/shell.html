@@ -158,6 +158,79 @@
         });
     }
 
+    // --- Pagination: jump-to-page ---
+    document.body.addEventListener('click', function(e) {
+        var display = e.target.closest('.page-display');
+        if (!display) return;
+        var jump = display.closest('.page-jump');
+        if (!jump) return;
+        var input = jump.querySelector('.page-input');
+        display.hidden = true;
+        input.hidden = false;
+        input.select();
+        input.focus();
+    });
+
+    function paginateToPage(input) {
+        var page = Math.max(1, Math.min(parseInt(input.value) || 1, parseInt(input.max) || 1));
+        var bar = input.closest('.panel-pagination');
+        var baseUrl = bar.dataset.baseUrl;
+        var target = bar.dataset.target;
+        var extra = bar.dataset.extraParams || '';
+        var url = baseUrl + '?page=' + page + extra;
+        htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
+    }
+
+    document.body.addEventListener('keydown', function(e) {
+        if (!e.target.classList.contains('page-input')) return;
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            paginateToPage(e.target);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            var jump = e.target.closest('.page-jump');
+            e.target.hidden = true;
+            jump.querySelector('.page-display').hidden = false;
+        }
+    });
+
+    document.body.addEventListener('focusout', function(e) {
+        if (!e.target.classList.contains('page-input')) return;
+        // Delay to allow click events to fire first
+        var input = e.target;
+        setTimeout(function() {
+            if (!input.hidden) {
+                var jump = input.closest('.page-jump');
+                if (jump) {
+                    input.hidden = true;
+                    jump.querySelector('.page-display').hidden = false;
+                }
+            }
+        }, 150);
+    });
+
+    // --- Pagination: page size selector ---
+    document.body.addEventListener('change', function(e) {
+        if (!e.target.classList.contains('page-size-select')) return;
+        var select = e.target;
+        var bar = select.closest('.panel-pagination');
+        var baseUrl = bar.dataset.baseUrl;
+        var target = bar.dataset.target;
+        var extra = bar.dataset.extraParams || '';
+        // Remove existing page_size from extra params, then add new one
+        extra = extra.replace(/&page_size=[^&]*/g, '');
+        var url = baseUrl + '?page=1&page_size=' + select.value + extra;
+        htmx.ajax('GET', url, {target: target, swap: 'innerHTML'});
+    });
+
+    // --- Pagination: scroll to top on page change ---
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        var target = e.detail.target;
+        if (target && target.closest('.panel')) {
+            target.closest('.panel').scrollTop = 0;
+        }
+    });
+
     // --- Row auto-save logic ---
     function getLotRow(el) {
         var tr = el.closest('tr[id^="lot-row-"]');
