@@ -1,5 +1,5 @@
 <div class="panel-header">
-    <form class="panel-filter" hx-get="/panels/sellers/" hx-target="#panel-left1-content" hx-swap="innerHTML" hx-indicator="#panel-left1 .htmx-indicator">
+    <form class="panel-filter" hx-get="/panels/sellers/" hx-target="#panel-left1-content" hx-swap="innerHTML" hx-indicator="#panel-left1">
         <input type="text" name="name" class="panel-filter-input" value="{{ filter_name }}"
                placeholder="{% if selected_seller_id and selected_seller_name %}Selected: {{ selected_seller_name }}{% else %}Filter sellers...{% endif %}"
                autocomplete="off">
@@ -14,7 +14,7 @@
         hx-get="/panels/sellers/{{ seller.id }}/events/"
         hx-target="#panel-left2-content"
         hx-swap="innerHTML"
-        hx-indicator="#panel-left2 .htmx-indicator">
+        hx-indicator="#panel-left2">
         <span class="panel-item-title">{{ seller.name|default:"(unnamed)" }} <span class="panel-item-id">{{ seller.customer_display_id }}</span></span>
     </li>
     {% endfor %}

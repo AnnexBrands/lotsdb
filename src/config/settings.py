@@ -70,3 +70,16 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- API response caching ---
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "lotsdb-cache",
+        "TIMEOUT": 600,  # 10 minutes
+        "OPTIONS": {"MAX_ENTRIES": 500},
+    }
+}
+
+# Max concurrent threads for fetching lots from ABConnect API
+LOT_FETCH_MAX_WORKERS = 10

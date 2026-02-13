@@ -1,4 +1,8 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from django.conf import settings
+from django.core.cache import cache
 
 from ABConnect import ABConnectAPI
 
@@ -54,8 +58,14 @@ def list_catalogs(request, page=1, page_size=25, seller_id=None, **filters):
 
 
 def get_catalog(request, catalog_id):
+    cache_key = f"catalog:{catalog_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     api = get_catalog_api(request)
-    return api.catalogs.get(catalog_id)
+    result = api.catalogs.get(catalog_id)
+    cache.set(cache_key, result)
+    return result
 
 
 # --- Lot service methods ---
@@ -69,16 +79,53 @@ def list_lots_by_catalog(request, customer_catalog_id, page=1, page_size=25):
 
 
 def get_lot(request, lot_id):
+    cache_key = f"lot:{lot_id}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
     api = get_catalog_api(request)
-    return api.lots.get(lot_id)
+    result = api.lots.get(lot_id)
+    cache.set(cache_key, result)
+    return result
 
 
 def get_lots_for_event(request, lot_ids):
-    """Fetch full LotDto for each lot ID. No batch API available."""
-    results = []
-    for lot_id in lot_ids:
-        results.append(get_lot(request, lot_id))
-    return results
+    """Fetch full LotDto for each lot ID, serving cached lots and fetching the rest concurrently."""
+    if not lot_ids:
+        return []
+
+    # Partition into cached and uncached
+    results = [None] * len(lot_ids)
+    uncached = []  # list of (index, lot_id)
+    for i, lot_id in enumerate(lot_ids):
+        cached = cache.get(f"lot:{lot_id}")
+        if cached is not None:
+            results[i] = cached
+        else:
+            uncached.append((i, lot_id))
+
+    if not uncached:
+        return [r for r in results if r is not None]
+
+    # Fetch uncached lots concurrently
+    max_workers = getattr(settings, "LOT_FETCH_MAX_WORKERS", 10)
+
+    def _fetch_one(lot_id):
+        api = get_catalog_api(request)
+        return api.lots.get(lot_id)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {pool.submit(_fetch_one, lid): idx for idx, lid in uncached}
+        for future in as_completed(futures):
+            idx = futures[future]
+            try:
+                lot = future.result()
+                results[idx] = lot
+                cache.set(f"lot:{lot_ids[idx]}", lot)
+            except Exception:
+                logger.warning("Failed to fetch lot %s", lot_ids[idx])
+
+    return [r for r in results if r is not None]
 
 
 def save_lot_override(request, lot_id, override_data):
@@ -95,7 +142,9 @@ def save_lot_override(request, lot_id, override_data):
         overriden_data=[override],
         catalogs=lot.catalogs,
     )
-    return api.lots.update(lot_id, update_req)
+    result = api.lots.update(lot_id, update_req)
+    cache.delete(f"lot:{lot_id}")
+    return result
 
 
 def bulk_insert(request, data):
