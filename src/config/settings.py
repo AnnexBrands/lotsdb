@@ -70,3 +70,7 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Access Control ---
+AUTHENTICATION_BACKENDS = ["django.contrib.auth.backends.ModelBackend"]
+ACCESS_POLICY = "staff"

@@ -34,3 +34,8 @@ def login_view(request):
 def logout_view(request):
     request.session.flush()
     return HttpResponseRedirect(reverse("login"))
+
+
+def no_access(request):
+    """Render the 'no access' page for unauthorized users."""
+    return render(request, "catalog/auth/no_access.html", status=403)

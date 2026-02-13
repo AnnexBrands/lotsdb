@@ -8,6 +8,8 @@ from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_
 from catalog.views.sellers import seller_list
 from conftest import AUTH_SESSION
 
+_MOCK_STAFF_USER = SimpleNamespace(is_staff=True, is_authenticated=True, pk=1, id=1)
+
 
 @pytest.fixture
 def factory():
@@ -17,6 +19,7 @@ def factory():
 def _make_get(factory, path, params=None):
     request = factory.get(path, params or {})
     request.session = AUTH_SESSION.copy()
+    request.user = _MOCK_STAFF_USER
     return request
 
 
@@ -944,6 +947,7 @@ class TestLotOverridePanelContract:
             "force_crate": "on",
         })
         request.session = AUTH_SESSION.copy()
+        request.user = _MOCK_STAFF_USER
         response = lot_override_panel(request, lot_id=42)
 
         content = response.content.decode()
