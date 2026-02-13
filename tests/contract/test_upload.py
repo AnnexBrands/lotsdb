@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -7,6 +8,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from catalog.views.imports import upload_catalog
 from conftest import AUTH_SESSION
+
+_MOCK_STAFF_USER = SimpleNamespace(is_staff=True, is_authenticated=True, pk=1, id=1)
 
 
 @pytest.fixture
@@ -18,6 +21,7 @@ def _make_post(factory, auth_session, filename, content=b"data", content_type="a
     f = SimpleUploadedFile(filename, content, content_type=content_type)
     request = factory.post("/imports/upload/", {"file": f})
     request.session = auth_session
+    request.user = _MOCK_STAFF_USER
     return request
 
 
@@ -25,6 +29,7 @@ class TestUploadCatalogContract:
     def test_no_file_returns_error(self, factory, auth_session):
         request = factory.post("/imports/upload/")
         request.session = auth_session
+        request.user = _MOCK_STAFF_USER
         response = upload_catalog(request)
         data = json.loads(response.content)
         assert data["success"] is False

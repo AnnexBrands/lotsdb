@@ -1,6 +1,6 @@
 from django.urls import path
 
-from catalog.views.auth import login_view, logout_view
+from catalog.views.auth import login_view, logout_view, no_access
 from catalog.views.sellers import seller_list, seller_detail
 from catalog.views.events import event_detail
 from catalog.views.lots import lot_detail, override_form
@@ -11,6 +11,7 @@ from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_
 urlpatterns = [
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
+    path("no-access/", no_access, name="no_access"),
     path("", seller_list, name="home"),
     path("sellers/", seller_list, name="seller_list"),
     path("panels/sellers/", sellers_panel, name="sellers_panel"),

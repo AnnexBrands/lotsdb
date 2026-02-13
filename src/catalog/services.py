@@ -1,14 +1,26 @@
 import logging
 
 from ABConnect import ABConnectAPI
+from django.contrib.auth import login as django_login
+from django.contrib.auth.models import User
 
 logger = logging.getLogger(__name__)
 
 
 def login(request, username, password):
-    """Authenticate via ABConnectAPI with session-based token storage."""
+    """Authenticate via ABConnect, then bridge to Django User."""
     ABConnectAPI(request=request, username=username, password=password)
     request.session["abc_username"] = username
+
+    # Bridge to Django User for authorization support
+    user, created = User.objects.get_or_create(
+        username=username,
+        defaults={"is_staff": True},
+    )
+    if created:
+        user.set_unusable_password()
+        user.save()
+    django_login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
 
 def get_catalog_api(request):
