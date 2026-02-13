@@ -1,3 +1,4 @@
+{% load catalog_tags %}
 <tr id="lot-row-{{ row.lot.id }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %} hx-post="/panels/lots/{{ row.lot.id }}/override/" hx-trigger="submit" hx-target="closest tr" hx-swap="outerHTML" hx-indicator="closest tr">
     <td class="lot-thumb-cell">
         <button type="button" class="lot-thumb-btn" hx-get="/panels/lots/{{ row.lot.id }}/detail/" hx-target="#lot-modal-body" hx-swap="innerHTML" aria-label="View lot {{ row.lot_number|default:row.lot.id }} details">
@@ -11,17 +12,26 @@
     </td>
     <td>
         <div class="lot-desc-cell">
-            <textarea name="description" class="lot-input lot-input-wide" rows="2" placeholder="Description">{{ row.fields.description.value|default:"" }}</textarea>
-            <div class="lot-notes-display">{% if row.fields.notes.value %}<span class="lot-notes-text">{{ row.fields.notes.value }}</span> <button type="button" class="lot-notes-more" hx-get="/panels/lots/{{ row.lot.id }}/detail/" hx-target="#lot-modal-body" hx-swap="innerHTML" aria-label="View full lot details">more</button>{% endif %}</div>
+            <button type="button" class="lot-desc-text" hx-get="/panels/lots/{{ row.lot.id }}/detail/" hx-target="#lot-modal-body" hx-swap="innerHTML" aria-label="View lot details">{{ row.fields.description.value|default:"" }}</button>
+            {% if row.fields.notes.value %}<div class="lot-desc-notes">{{ row.fields.notes.value }}</div>{% endif %}
         </div>
     </td>
-    <td{% if row.fields.qty.changed %} class="overridden" title="Original: {{ row.fields.qty.original }}"{% endif %}><input type="number" name="qty" value="{{ row.fields.qty.value|default:"" }}" class="lot-input lot-input-num"></td>
-    <td{% if row.fields.l.changed %} class="overridden" title="Original: {{ row.fields.l.original }}"{% endif %}><input type="number" name="l" value="{{ row.fields.l.value|default:"" }}" class="lot-input lot-input-num" step="any"></td>
-    <td{% if row.fields.w.changed %} class="overridden" title="Original: {{ row.fields.w.original }}"{% endif %}><input type="number" name="w" value="{{ row.fields.w.value|default:"" }}" class="lot-input lot-input-num" step="any"></td>
-    <td{% if row.fields.h.changed %} class="overridden" title="Original: {{ row.fields.h.original }}"{% endif %}><input type="number" name="h" value="{{ row.fields.h.value|default:"" }}" class="lot-input lot-input-num" step="any"></td>
-    <td{% if row.fields.wgt.changed %} class="overridden" title="Original: {{ row.fields.wgt.original }}"{% endif %}><input type="number" name="wgt" value="{{ row.fields.wgt.value|default:"" }}" class="lot-input lot-input-num" step="any"></td>
-    <td{% if row.fields.cpack.changed %} class="overridden" title="Original: {{ row.fields.cpack.original }}"{% endif %}><select name="cpack" class="lot-input lot-input-sm"><option value="">—</option><option value="1"{% if row.fields.cpack.value == "1" %} selected{% endif %}>1</option><option value="2"{% if row.fields.cpack.value == "2" %} selected{% endif %}>2</option><option value="3"{% if row.fields.cpack.value == "3" %} selected{% endif %}>3</option><option value="4"{% if row.fields.cpack.value == "4" %} selected{% endif %}>4</option><option value="PBO"{% if row.fields.cpack.value == "PBO" %} selected{% endif %}>PBO</option></select></td>
-    <td{% if row.fields.force_crate.changed %} class="overridden" title="Original: {{ row.fields.force_crate.original }}"{% endif %}><input type="checkbox" name="force_crate" {% if row.fields.force_crate.value %}checked{% endif %}></td>
-    <td{% if row.fields.do_not_tip.changed %} class="overridden" title="Original: {{ row.fields.do_not_tip.original }}"{% endif %}><input type="checkbox" name="do_not_tip" {% if row.fields.do_not_tip.value %}checked{% endif %}></td>
+    <td>
+        <div class="lot-dims">
+            <input type="number" name="qty" value="{{ row.fields.qty.value|format_number }}" class="lot-input lot-dims-input{% if row.fields.qty.changed %} lot-input-overridden{% endif %}" onfocus="this.select()"{% if row.fields.qty.changed %} title="Original: {{ row.fields.qty.original }}"{% endif %}>
+            <span class="lot-dims-sep">@</span>
+            <input type="number" name="l" value="{{ row.fields.l.value|format_number }}" class="lot-input lot-dims-input{% if row.fields.l.changed %} lot-input-overridden{% endif %}" step="any" onfocus="this.select()"{% if row.fields.l.changed %} title="Original: {{ row.fields.l.original }}"{% endif %}>
+            <span class="lot-dims-sep">x</span>
+            <input type="number" name="w" value="{{ row.fields.w.value|format_number }}" class="lot-input lot-dims-input{% if row.fields.w.changed %} lot-input-overridden{% endif %}" step="any" onfocus="this.select()"{% if row.fields.w.changed %} title="Original: {{ row.fields.w.original }}"{% endif %}>
+            <span class="lot-dims-sep">x</span>
+            <input type="number" name="h" value="{{ row.fields.h.value|format_number }}" class="lot-input lot-dims-input{% if row.fields.h.changed %} lot-input-overridden{% endif %}" step="any" onfocus="this.select()"{% if row.fields.h.changed %} title="Original: {{ row.fields.h.original }}"{% endif %}>
+            <span class="lot-dims-sep">,</span>
+            <input type="number" name="wgt" value="{{ row.fields.wgt.value|format_number }}" class="lot-input lot-dims-wgt{% if row.fields.wgt.changed %} lot-input-overridden{% endif %}" step="any" onfocus="this.select()"{% if row.fields.wgt.changed %} title="Original: {{ row.fields.wgt.original }}"{% endif %}>
+            <span class="lot-dims-sep">lbs</span>
+        </div>
+    </td>
+    <td><select name="cpack" class="lot-input lot-input-sm cpack-badge {{ row.fields.cpack.value|cpack_class }}{% if row.fields.cpack.changed %} lot-input-overridden{% endif %}"{% if row.fields.cpack.changed %} title="Original: {{ row.fields.cpack.original }}"{% endif %}><option value="">—</option><option value="1"{% if row.fields.cpack.value == "1" %} selected{% endif %}>NF</option><option value="2"{% if row.fields.cpack.value == "2" %} selected{% endif %}>LF</option><option value="3"{% if row.fields.cpack.value == "3" %} selected{% endif %}>F</option><option value="4"{% if row.fields.cpack.value == "4" %} selected{% endif %}>VF</option><option value="PBO"{% if row.fields.cpack.value == "PBO" %} selected{% endif %}>PBO</option></select></td>
+    <td><input type="checkbox" name="force_crate" {% if row.fields.force_crate.value %}checked{% endif %}{% if row.fields.force_crate.changed %} class="lot-input-overridden" title="Original: {{ row.fields.force_crate.original }}"{% endif %}></td>
+    <td><input type="checkbox" name="do_not_tip" {% if row.fields.do_not_tip.value %}checked{% endif %}{% if row.fields.do_not_tip.changed %} class="lot-input-overridden" title="Original: {{ row.fields.do_not_tip.original }}"{% endif %}></td>
     <td><button type="submit" class="btn-icon" title="Save override"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button></td>
 </tr>

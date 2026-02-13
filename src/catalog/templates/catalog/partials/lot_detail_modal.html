@@ -1,17 +1,50 @@
 {% load catalog_tags %}
 <div data-lot-title="Lot {{ lot.catalogs.0.lot_number|default:lot.id }}">
-    <div class="detail-header">
-        <h1>Lot {{ lot.catalogs.0.lot_number|default:lot.id }}</h1>
-        <dl class="meta">
-            <dt>Customer Item ID</dt><dd>{{ lot.customer_item_id|default:"—" }}</dd>
-        </dl>
-        <div style="margin-top: 0.75rem;">
-            <button hx-get="/panels/lots/{{ lot.id }}/detail/?edit=1" hx-target="#lot-modal-body" hx-swap="innerHTML" class="btn btn-primary">Edit Override</button>
-        </div>
+    {% if lot.image_links %}
+    <div class="lot-gallery">
+        {% for img in lot.image_links %}
+        <img src="{{ img.link }}" alt="Lot image {{ forloop.counter }}">
+        {% endfor %}
+    </div>
+    {% if lot.image_links|length > 1 %}
+    <div class="lot-gallery-thumbs">
+        {% for img in lot.image_links %}
+        <button type="button" class="lot-gallery-thumb{% if forloop.first %} active{% endif %}" onclick="scrollToGalleryImage({{ forloop.counter0 }})">
+            <img src="{{ img.link }}" alt="">
+        </button>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="lot-gallery-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span>No images</span>
+    </div>
+    {% endif %}
+
+    <div class="lot-modal-section">
+        <h3>Description</h3>
+        <textarea name="description" class="lot-modal-textarea"
+            hx-post="/panels/lots/{{ lot.id }}/text-save/"
+            hx-trigger="change"
+            hx-swap="none"
+            hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>{{ lot_description }}</textarea>
+    </div>
+
+    <div class="lot-modal-section">
+        <h3>Notes</h3>
+        <textarea name="notes" class="lot-modal-textarea"
+            hx-post="/panels/lots/{{ lot.id }}/text-save/"
+            hx-trigger="change"
+            hx-swap="none"
+            hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>{{ lot_notes }}</textarea>
     </div>
 
     <div class="lot-data">
-        <h2>Lot Data</h2>
+        <h3>Details</h3>
+        <dl class="meta">
+            <dt>Customer Item ID</dt><dd>{{ lot.customer_item_id|default:"—" }}</dd>
+        </dl>
         <table>
             <thead>
                 <tr>
@@ -44,16 +77,8 @@
                 {% endfor %}
             </tbody>
         </table>
-    </div>
-
-    {% if lot.image_links %}
-    <div class="lot-data">
-        <h2>Images</h2>
-        <div class="images">
-            {% for img in lot.image_links %}
-            <img src="{{ img.link }}" alt="Lot image {{ forloop.counter }}">
-            {% endfor %}
+        <div style="margin-top: 0.75rem;">
+            <button hx-get="/panels/lots/{{ lot.id }}/detail/?edit=1" hx-target="#lot-modal-body" hx-swap="innerHTML" class="btn btn-secondary">Edit Details</button>
         </div>
     </div>
-    {% endif %}
 </div>

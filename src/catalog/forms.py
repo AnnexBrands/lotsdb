@@ -9,8 +9,6 @@ class OverrideForm(forms.Form):
     wgt = forms.DecimalField(label="Weight", required=False, decimal_places=2, max_digits=10)
     value = forms.DecimalField(label="Value", required=False, decimal_places=2, max_digits=12)
     cpack = forms.CharField(label="Case/Pack", required=False, max_length=200)
-    description = forms.CharField(label="Description", required=False, widget=forms.Textarea(attrs={"rows": 3}))
-    notes = forms.CharField(label="Notes", required=False, widget=forms.Textarea(attrs={"rows": 2}))
     noted_conditions = forms.CharField(label="Conditions", required=False, widget=forms.Textarea(attrs={"rows": 2}))
     commodity_id = forms.IntegerField(label="Commodity ID", required=False)
     force_crate = forms.BooleanField(label="Force Crate", required=False)
