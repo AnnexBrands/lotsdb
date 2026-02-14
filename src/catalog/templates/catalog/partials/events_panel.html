@@ -26,7 +26,7 @@
     <p>No events for this seller</p>
 </div>
 {% endif %}
-
+{% if from_cache %}<div style="display:none" hx-get="/panels/sellers/{{ seller_id }}/events/?fresh=1" hx-target="#panel-left2-content" hx-swap="innerHTML" hx-trigger="load" data-swr-refresh="true"></div>{% endif %}
 {% if not skip_main_oob %}
 <div id="panel-main-content" hx-swap-oob="innerHTML">
     <div class="panel-empty">

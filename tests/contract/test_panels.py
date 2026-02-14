@@ -709,7 +709,7 @@ class TestPanelFilterContract:
         response = seller_events_panel(request, seller_id=1)
 
         assert response.status_code == 200
-        mock_catalogs.assert_called_once_with(request, page=1, page_size=200, seller_id=1, Title="Test")
+        mock_catalogs.assert_called_once_with(request, page=1, page_size=200, seller_id=1, use_cache=True, future_only=False, Title="Test")
 
     @patch("catalog.views.panels.services.list_sellers")
     def test_sellers_panel_contains_filter_form(self, mock_list, factory):
@@ -1300,3 +1300,148 @@ class TestCacheFallbackContract:
         result = svc_module.list_catalogs(request, seller_id=42)
 
         assert result.items[0].title == "Event"
+
+
+class TestCachePolishContract:
+    """Contract tests for cache polish fixes (016-cache-polish TC-P01..TC-P02)."""
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_start_date_survives_cache_round_trip_as_datetime(self, mock_api, mock_get, mock_set, factory):
+        """TC-P01: Cached start_date ISO string is parsed back to datetime on read."""
+        mock_get.return_value = [
+            {"id": 7, "title": "Spring Auction", "customer_catalog_id": "SA-2026",
+             "start_date": "2099-01-01T00:00:00"},
+        ]
+        request = _make_get(factory, "/panels/sellers/42/events/")
+        result = svc_module.list_catalogs(request, seller_id=42)
+
+        item = result.items[0]
+        assert isinstance(item.start_date, datetime)
+        assert item.start_date.year == 2099
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_cached_catalog_pagination_respects_page_size(self, mock_api, mock_get, mock_set, factory):
+        """TC-P02: Cached catalogs honor page/page_size args."""
+        mock_get.return_value = [
+            {"id": i, "title": f"Event {i}", "customer_catalog_id": f"E{i}",
+             "start_date": "2099-06-01T00:00:00"}
+            for i in range(30)
+        ]
+        request = _make_get(factory, "/panels/sellers/42/events/")
+        result = svc_module.list_catalogs(request, page=2, page_size=25, seller_id=42)
+
+        assert len(result.items) == 5
+        assert result.has_previous_page is True
+        assert result.has_next_page is False
+
+
+class TestSWRContract:
+    """Contract tests for stale-while-revalidate events panel (016-cache-polish TC-SWR01..05)."""
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.get_seller")
+    @patch("catalog.views.panels.safe_cache_get")
+    def test_cache_hit_includes_refresh_trigger(self, mock_cache_get, mock_seller, mock_sellers, factory):
+        """TC-SWR01: Cache hit serves HTML with fresh=1 auto-refresh trigger."""
+        mock_cache_get.return_value = [
+            {"id": 1, "title": "Cached Event", "customer_catalog_id": "C1",
+             "start_date": "2099-01-01T00:00:00"},
+        ]
+        mock_seller.return_value = _mock_seller(id=1)
+        mock_sellers.return_value = _mock_paginated([_mock_seller(id=1)])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        assert "Cached Event" in content
+        assert "fresh=1" in content
+        assert 'hx-trigger="load"' in content
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    @patch("catalog.views.panels.safe_cache_get")
+    def test_fresh_request_no_trigger(self, mock_cache_get, mock_seller, mock_catalogs, mock_sellers, factory):
+        """TC-SWR02: ?fresh=1 request returns HTML without trigger div."""
+        mock_seller.return_value = _mock_seller(id=1)
+        mock_catalogs.return_value = _mock_paginated([
+            _mock_event(id=1, title="Fresh Event", start_date=datetime(2099, 1, 1)),
+        ])
+        mock_sellers.return_value = _mock_paginated([_mock_seller(id=1)])
+        request = _make_get(factory, "/panels/sellers/1/events/", {"fresh": "1"})
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        assert "Fresh Event" in content
+        assert "fresh=1" not in content
+        mock_cache_get.assert_not_called()
+        mock_catalogs.assert_called_once_with(
+            request, page=1, page_size=200, seller_id=1,
+            use_cache=False, future_only=False,
+        )
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    @patch("catalog.views.panels.safe_cache_get")
+    def test_cache_miss_no_trigger(self, mock_cache_get, mock_seller, mock_catalogs, mock_sellers, factory):
+        """TC-SWR03: Cache miss returns normal HTML without refresh trigger."""
+        mock_cache_get.return_value = None
+        mock_seller.return_value = _mock_seller(id=1)
+        mock_catalogs.return_value = _mock_paginated([
+            _mock_event(id=1, title="API Event", start_date=datetime(2099, 1, 1)),
+        ])
+        mock_sellers.return_value = _mock_paginated([_mock_seller(id=1)])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        assert "API Event" in content
+        assert 'data-swr-refresh' not in content
+        mock_catalogs.assert_called_once_with(
+            request, page=1, page_size=200, seller_id=1,
+            use_cache=True, future_only=False,
+        )
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    @patch("catalog.views.panels.safe_cache_get")
+    def test_filter_bypasses_cache_no_trigger(self, mock_cache_get, mock_seller, mock_catalogs, mock_sellers, factory):
+        """TC-SWR04: Filter active bypasses cache, no trigger div."""
+        mock_seller.return_value = _mock_seller(id=1)
+        mock_catalogs.return_value = _mock_paginated([
+            _mock_event(id=1, title="Filtered Event", start_date=datetime(2099, 1, 1)),
+        ])
+        mock_sellers.return_value = _mock_paginated([_mock_seller(id=1)])
+        request = _make_get(factory, "/panels/sellers/1/events/", {"title": "foo"})
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        assert "Filtered Event" in content
+        assert 'data-swr-refresh' not in content
+        mock_cache_get.assert_not_called()
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    @patch("catalog.views.panels.safe_cache_get")
+    def test_fresh_request_no_push_url(self, mock_cache_get, mock_seller, mock_catalogs, mock_sellers, factory):
+        """TC-SWR05: ?fresh=1 request has no HX-Push-Url header."""
+        mock_seller.return_value = _mock_seller(id=1)
+        mock_catalogs.return_value = _mock_paginated([
+            _mock_event(id=1, title="Fresh", start_date=datetime(2099, 1, 1)),
+        ])
+        mock_sellers.return_value = _mock_paginated([_mock_seller(id=1)])
+        request = _make_get(factory, "/panels/sellers/1/events/", {"fresh": "1"})
+        response = seller_events_panel(request, seller_id=1)
+
+        assert "HX-Push-Url" not in response
+        mock_catalogs.assert_called_once_with(
+            request, page=1, page_size=200, seller_id=1,
+            use_cache=False, future_only=False,
+        )

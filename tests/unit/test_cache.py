@@ -16,8 +16,8 @@ class TestSafeCacheGet:
 
     @patch("catalog.cache.cache")
     def test_returns_default_on_miss(self, mock_cache):
-        mock_cache.get.return_value = None
-        assert safe_cache_get("mykey", default="fallback") is None
+        mock_cache.get.return_value = "fallback"
+        assert safe_cache_get("mykey", default="fallback") == "fallback"
         mock_cache.get.assert_called_once_with("mykey", "fallback")
 
     @patch("catalog.cache.cache")

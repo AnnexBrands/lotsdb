@@ -1,10 +1,13 @@
 import json
 import logging
+from datetime import datetime
+from types import SimpleNamespace
 
 from django.shortcuts import render
 
 from ABConnect.exceptions import ABConnectError
 from catalog import services
+from catalog.cache import safe_cache_get
 from catalog.forms import OverrideForm
 
 logger = logging.getLogger(__name__)
@@ -146,29 +149,55 @@ def seller_events_panel(request, seller_id):
     """Return HTML fragment: events list for Left2 panel + OOB seller list with selection."""
     page, page_size = _parse_page_params(request)
     filter_title = request.GET.get("title", "").strip()
+    is_fresh = request.GET.get("fresh") == "1"
 
     filters = {}
     if filter_title:
         filters["Title"] = filter_title
 
+    from_cache = False
+
+    # SWR: serve events from cache when available (non-fresh, non-filtered)
+    if not is_fresh and not filters:
+        cache_key = f"{services.CATALOGS_CACHE_KEY_PREFIX}{seller_id}"
+        cached = safe_cache_get(cache_key)
+        if cached is not None:
+            from_cache = True
+            items = []
+            for d in cached:
+                d = dict(d)  # copy to avoid mutating cached data
+                if d.get("start_date"):
+                    d["start_date"] = datetime.fromisoformat(d["start_date"])
+                items.append(SimpleNamespace(**d))
+            items.sort(key=lambda e: e.start_date or "", reverse=True)
+            page_events, paginated = _paginate_locally(items, page, page_size)
+
+    if not from_cache:
+        try:
+            all_result = services.list_catalogs(
+                request, page=1, page_size=200, seller_id=seller_id,
+                use_cache=not is_fresh, future_only=False, **filters,
+            )
+        except ABConnectError:
+            logger.exception("Failed to load events for seller %s", seller_id)
+            return render(request, "catalog/partials/panel_error.html", {
+                "error_message": "Could not load events",
+                "retry_url": f"/panels/sellers/{seller_id}/events/",
+                "retry_target": "#panel-left2-content",
+            })
+        all_result.items.sort(key=lambda e: e.start_date or "", reverse=True)
+        page_events, paginated = _paginate_locally(all_result.items, page, page_size)
+
     try:
         seller = services.get_seller(request, seller_id)
-        # Fetch all events to sort globally before local pagination — FR-011
-        all_result = services.list_catalogs(request, page=1, page_size=200, seller_id=seller_id, **filters)
         sellers_result = services.list_sellers(request, page=1, page_size=50)
     except ABConnectError:
-        logger.exception("Failed to load events for seller %s", seller_id)
+        logger.exception("Failed to load seller info for %s", seller_id)
         return render(request, "catalog/partials/panel_error.html", {
             "error_message": "Could not load events",
             "retry_url": f"/panels/sellers/{seller_id}/events/",
             "retry_target": "#panel-left2-content",
         })
-
-    # Sort events by start_date descending (most recent first) — FR-011
-    all_result.items.sort(key=lambda e: e.start_date or "", reverse=True)
-
-    # Paginate locally after sorting
-    page_events, paginated = _paginate_locally(all_result.items, page, page_size)
 
     extra_params = {"selected": seller_id}
     if page_size != 50:
@@ -182,12 +211,15 @@ def seller_events_panel(request, seller_id):
         "pagination_url": f"/panels/sellers/{seller_id}/events/",
         "selected_seller_id": seller_id,
         "selected_seller_name": seller.name,
-        "oob_sellers": sellers_result.items,
-        "oob_sellers_paginated": sellers_result,
+        "oob_sellers": sellers_result.items if not is_fresh else None,
+        "oob_sellers_paginated": sellers_result if not is_fresh else None,
         "pagination_extra_params": extra_params,
         "filter_title": filter_title,
+        "from_cache": from_cache,
+        "skip_main_oob": is_fresh,
     })
-    response["HX-Push-Url"] = f"/?seller={seller.customer_display_id}"
+    if not is_fresh:
+        response["HX-Push-Url"] = f"/?seller={seller.customer_display_id}"
     return response
 
 
@@ -225,7 +257,7 @@ def event_lots_panel(request, event_id):
         # Resolve seller from event data for OOB re-render and URL push
         seller_id = event.sellers[0].id if event.sellers else None
         if seller_id:
-            events_result = services.list_catalogs(request, page=1, page_size=50, seller_id=seller_id)
+            events_result = services.list_catalogs(request, page=1, page_size=50, seller_id=seller_id, future_only=False)
         else:
             events_result = None
     except ABConnectError:

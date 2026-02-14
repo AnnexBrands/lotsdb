@@ -247,12 +247,13 @@
     });
 
     // --- Skeleton loading for events panel on seller click ---
+    var skeletonItem = '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>';
     var skeletonHTML = '<div class="skeleton-loading">'
         + '<div class="skeleton-spinner"><div class="spinner"></div></div>'
         + '<ul class="skeleton-list">'
-        + '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>'
-        + '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>'
-        + '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>'
+        + skeletonItem + skeletonItem + skeletonItem + skeletonItem + skeletonItem
+        + skeletonItem + skeletonItem + skeletonItem + skeletonItem + skeletonItem
+        + skeletonItem + skeletonItem + skeletonItem + skeletonItem + skeletonItem
         + '</ul></div>';
     var mainEmptyHTML = '<div class="panel-empty">'
         + '<div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>'
@@ -274,19 +275,52 @@
         + '<th style="text-align:center">Crate</th>'
         + '<th style="text-align:center">DNT</th>'
         + '<th></th></tr></thead><tbody>'
-        + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
+        + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
+        + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
+        + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
         + '</tbody></table>';
 
     document.body.addEventListener('htmx:beforeRequest', function(e) {
         var target = e.detail.target;
+        var reqUrl = e.detail.pathInfo && e.detail.pathInfo.requestPath || '';
+        // SWR: skip skeleton for background refresh requests (cached content already visible)
         if (target && target.id === 'panel-left2-content' && e.detail.elt.classList.contains('panel-item')) {
             target.innerHTML = skeletonHTML;
+            target.setAttribute('data-seller-id', '');
             var mainContent = document.getElementById('panel-main-content');
             if (mainContent) mainContent.innerHTML = mainEmptyHTML;
         }
         // Show lots skeleton when clicking an event item (panel-item inside events panel)
         if (target && target.id === 'panel-main-content' && e.detail.elt.classList.contains('panel-item') && e.detail.elt.closest && e.detail.elt.closest('#panel-left2')) {
             target.innerHTML = lotsSkeletonHTML;
+        }
+    });
+
+    // SWR: track current seller on events panel and guard stale refresh swaps
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        var target = e.detail.target;
+        if (target && target.id === 'panel-left2-content') {
+            // Extract seller_id from the response URL (e.g., /panels/sellers/42/events/)
+            var reqPath = e.detail.pathInfo && e.detail.pathInfo.requestPath || '';
+            var m = reqPath.match(/\/panels\/sellers\/(\d+)\/events\//);
+            if (m && reqPath.indexOf('fresh=1') === -1) {
+                target.setAttribute('data-seller-id', m[1]);
+            }
+        }
+    });
+
+    document.body.addEventListener('htmx:beforeSwap', function(e) {
+        var target = e.detail.target;
+        if (target && target.id === 'panel-left2-content') {
+            var reqPath = e.detail.pathInfo && e.detail.pathInfo.requestPath || '';
+            if (reqPath.indexOf('fresh=1') !== -1) {
+                // This is a SWR background refresh — check if seller still matches
+                var m = reqPath.match(/\/panels\/sellers\/(\d+)\/events\//);
+                var currentSeller = target.getAttribute('data-seller-id');
+                if (m && currentSeller && m[1] !== currentSeller) {
+                    e.detail.shouldSwap = false;
+                }
+            }
         }
     });
 
