@@ -22,7 +22,7 @@ def login_view(request):
             )
         try:
             services.login(request, username, password)
-            return HttpResponseRedirect(reverse("seller_list"))
+            return HttpResponseRedirect(reverse("home"))
         except LoginFailedError:
             logger.warning("Login failed for user %s: invalid credentials", username)
             return render(

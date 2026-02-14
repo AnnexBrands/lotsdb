@@ -361,8 +361,10 @@ def lot_detail_panel(request, lot_id):
     # Compute effective description/notes (override if present, else initial)
     initial = lot.initial_data
     override = lot.overriden_data[0] if lot.overriden_data else None
-    lot_description = getattr(override, "description", None) or getattr(initial, "description", None) or ""
-    lot_notes = getattr(override, "notes", None) or getattr(initial, "notes", None) or ""
+    override_desc = getattr(override, "description", None) if override else None
+    lot_description = override_desc if override_desc is not None else (getattr(initial, "description", None) or "")
+    override_notes = getattr(override, "notes", None) if override else None
+    lot_notes = override_notes if override_notes is not None else (getattr(initial, "notes", None) or "")
     return render(request, "catalog/partials/lot_detail_modal.html", {
         "lot": lot,
         "has_override": has_override,

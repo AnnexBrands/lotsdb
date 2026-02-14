@@ -346,7 +346,8 @@
         // Fire queued save if there's a pending one
         if (tr._pendingSave) {
             tr._pendingSave = false;
-            if (tr.dataset.dirty === '1') htmx.trigger(tr, 'submit');
+            markDirty(tr);
+            htmx.trigger(tr, 'submit');
         }
     });
 
