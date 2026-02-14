@@ -283,10 +283,9 @@ class TestPaginationContract:
     @patch("catalog.views.panels.services.get_seller")
     def test_events_panel_pagination_targets_left2(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
         mock_seller.return_value = _mock_seller()
-        mock_catalogs.return_value = _mock_paginated(
-            [_mock_event()], total_items=100, page_number=1,
-            total_pages=4, has_next_page=True,
-        )
+        # Events are sorted locally then paginated; provide 51 events so page_size=50 gives 2 pages
+        events = [_mock_event(id=i, title=f"Event {i}") for i in range(51)]
+        mock_catalogs.return_value = _mock_paginated(events)
         mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
         request = _make_get(factory, "/panels/sellers/1/events/")
         response = seller_events_panel(request, seller_id=1)
@@ -708,7 +707,7 @@ class TestPanelFilterContract:
         response = seller_events_panel(request, seller_id=1)
 
         assert response.status_code == 200
-        mock_catalogs.assert_called_once_with(request, page=1, page_size=50, seller_id=1, Title="Test")
+        mock_catalogs.assert_called_once_with(request, page=1, page_size=200, seller_id=1, Title="Test")
 
     @patch("catalog.views.panels.services.list_sellers")
     def test_sellers_panel_contains_filter_form(self, mock_list, factory):

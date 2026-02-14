@@ -153,7 +153,8 @@ def seller_events_panel(request, seller_id):
 
     try:
         seller = services.get_seller(request, seller_id)
-        result = services.list_catalogs(request, page=page, page_size=page_size, seller_id=seller_id, **filters)
+        # Fetch all events to sort globally before local pagination — FR-011
+        all_result = services.list_catalogs(request, page=1, page_size=200, seller_id=seller_id, **filters)
         sellers_result = services.list_sellers(request, page=1, page_size=50)
     except ABConnectError:
         logger.exception("Failed to load events for seller %s", seller_id)
@@ -164,9 +165,10 @@ def seller_events_panel(request, seller_id):
         })
 
     # Sort events by start_date descending (most recent first) — FR-011
-    result.items.sort(key=lambda e: e.start_date or "", reverse=True)
+    all_result.items.sort(key=lambda e: e.start_date or "", reverse=True)
 
-    paginated = _enrich_pagination(result, page_size)
+    # Paginate locally after sorting
+    page_events, paginated = _paginate_locally(all_result.items, page, page_size)
 
     extra_params = {"selected": seller_id}
     if page_size != 50:
@@ -174,7 +176,7 @@ def seller_events_panel(request, seller_id):
 
     response = render(request, "catalog/partials/events_panel.html", {
         "seller": seller,
-        "events": result.items,
+        "events": page_events,
         "paginated": paginated,
         "seller_id": seller_id,
         "pagination_url": f"/panels/sellers/{seller_id}/events/",
