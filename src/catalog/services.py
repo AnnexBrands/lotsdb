@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 
 from ABConnect import ABConnectAPI
@@ -97,13 +97,20 @@ def find_seller_by_display_id(request, display_id):
 # --- Catalog (Event) service methods ---
 
 
-def list_catalogs(request, page=1, page_size=25, seller_id=None, **filters):
+def list_catalogs(request, page=1, page_size=25, seller_id=None, use_cache=True, **filters):
     if seller_id is not None and not filters:
         cache_key = f"{CATALOGS_CACHE_KEY_PREFIX}{seller_id}"
-        cached = safe_cache_get(cache_key)
+        if use_cache:
+            cached = safe_cache_get(cache_key)
+        else:
+            cached = None
         if cached is not None:
-            items = [SimpleNamespace(**d) for d in cached]
-            return _make_paginated(items, 1, len(items) or 1)
+            items = []
+            for d in cached:
+                if d.get("start_date"):
+                    d["start_date"] = datetime.fromisoformat(d["start_date"])
+                items.append(SimpleNamespace(**d))
+            return _make_paginated(items, page, page_size)
 
         api = get_catalog_api(request)
         result = api.catalogs.list(page_number=1, page_size=200, SellerIds=seller_id)
@@ -114,12 +121,16 @@ def list_catalogs(request, page=1, page_size=25, seller_id=None, **filters):
         ]
         projected = [
             {"id": c.id, "title": c.title, "customer_catalog_id": c.customer_catalog_id,
-             "start_date": str(c.start_date)}
+             "start_date": c.start_date.isoformat() if c.start_date else None}
             for c in future_items
         ]
         safe_cache_set(cache_key, projected)
-        items = [SimpleNamespace(**d) for d in projected]
-        return _make_paginated(items, 1, len(items) or 1)
+        items = []
+        for d in projected:
+            if d.get("start_date"):
+                d["start_date"] = datetime.fromisoformat(d["start_date"])
+            items.append(SimpleNamespace(**d))
+        return _make_paginated(items, page, page_size)
 
     api = get_catalog_api(request)
     if seller_id is not None:
