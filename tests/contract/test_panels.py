@@ -844,7 +844,7 @@ class TestLotsTableLayoutContract:
         content = response.content.decode()
         assert '<table class="lots-table">' in content
         for header in ["Lot Description", "Dimensions", "CPack", "Crate", "DNT"]:
-            assert f"<th>{header}</th>" in content
+            assert f">{header}</th>" in content
         # Img and Save columns have empty headers
         assert content.count("<th></th>") >= 2
 

@@ -377,6 +377,24 @@
         var tr = getLotRow(e.detail.elt);
         if (tr) tr.dataset.saving = '';
     });
+
+    // --- Arrow-key navigation between dims fields ---
+    document.body.addEventListener('keydown', function(e) {
+        var input = e.target;
+        if (!input.classList.contains('lot-dims-input') && !input.classList.contains('lot-dims-wgt')) return;
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        var row = input.closest('.lot-dims');
+        if (!row) return;
+        var inputs = Array.from(row.querySelectorAll('.lot-dims-input, .lot-dims-wgt'));
+        var idx = inputs.indexOf(input);
+        if (idx === -1) return;
+        var next = e.key === 'ArrowRight' ? inputs[idx + 1] : inputs[idx - 1];
+        if (next) {
+            e.preventDefault();
+            next.focus();
+            next.select();
+        }
+    });
 })();
 </script>
 {% endblock %}
