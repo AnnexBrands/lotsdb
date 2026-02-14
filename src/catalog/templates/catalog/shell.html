@@ -284,8 +284,8 @@
             var mainContent = document.getElementById('panel-main-content');
             if (mainContent) mainContent.innerHTML = mainEmptyHTML;
         }
-        // Show lots skeleton when clicking an event (panel-item inside events panel)
-        if (target && target.id === 'panel-main-content' && e.detail.elt.closest && e.detail.elt.closest('#panel-left2')) {
+        // Show lots skeleton when clicking an event item (panel-item inside events panel)
+        if (target && target.id === 'panel-main-content' && e.detail.elt.classList.contains('panel-item') && e.detail.elt.closest && e.detail.elt.closest('#panel-left2')) {
             target.innerHTML = lotsSkeletonHTML;
         }
     });
