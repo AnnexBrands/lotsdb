@@ -1095,6 +1095,58 @@ class TestLotOverridePanelContract:
         assert "description" not in call_args[0][2]
 
 
+class TestOobEventSortContract:
+    """Contract tests for OOB event sort stability on event selection (014-lots-skeleton-ux FR-008)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_oob_events_sorted_by_start_date_descending(self, mock_catalog, mock_catalogs, mock_get_lots, factory):
+        """OOB events in event_lots_panel response are sorted by start_date descending."""
+        events = [
+            _mock_event(id=1, title="Old Event", start_date="2024-01-01"),
+            _mock_event(id=2, title="New Event", start_date="2025-06-15"),
+            _mock_event(id=3, title="Mid Event", start_date="2024-07-01"),
+        ]
+        lot = _mock_lot(id=1)
+        mock_catalog.return_value = _mock_event(
+            id=1, sellers=[_mock_seller(id=42)], lots=[lot],
+        )
+        mock_catalogs.return_value = _mock_paginated(events)
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        new_pos = content.index("New Event")
+        mid_pos = content.index("Mid Event")
+        old_pos = content.index("Old Event")
+        assert new_pos < mid_pos < old_pos
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_oob_events_with_none_start_date_sorted_last(self, mock_catalog, mock_catalogs, mock_get_lots, factory):
+        """OOB events with None start_date appear after dated events."""
+        events = [
+            _mock_event(id=1, title="No Date", start_date=None),
+            _mock_event(id=2, title="Dated", start_date="2025-01-01"),
+        ]
+        lot = _mock_lot(id=1)
+        mock_catalog.return_value = _mock_event(
+            id=1, sellers=[_mock_seller(id=42)], lots=[lot],
+        )
+        mock_catalogs.return_value = _mock_paginated(events)
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        dated_pos = content.index("Dated")
+        no_date_pos = content.index("No Date")
+        assert dated_pos < no_date_pos
+
+
 class TestIndicatorWiringContract:
     """Contract tests for hx-indicator attributes on panel items (T003)."""
 

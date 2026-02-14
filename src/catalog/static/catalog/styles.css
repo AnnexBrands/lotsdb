@@ -252,6 +252,10 @@ tbody tr:hover { background: #f8fafc; }
 .skeleton-title { width: 60%; height: 0.8125rem; margin-bottom: 0.5rem; }
 .skeleton-meta { width: 40%; height: 0.625rem; }
 @keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.skeleton-table-row td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.skeleton-thumb { width: 56px; height: 56px; border-radius: 3px; background: #e2e8f0; animation: skeleton-pulse 1.5s ease-in-out infinite; }
+.skeleton-dims { display: flex; gap: 0.25rem; }
+.skeleton-dims-bar { width: 4ch; height: 1.25rem; }
 
 /* === Mobile Back Button === */
 .mobile-back-btn { display: none; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.8rem; color: #475569; cursor: pointer; position: fixed; top: 60px; left: 0.5rem; z-index: 20; }
