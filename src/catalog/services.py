@@ -97,7 +97,7 @@ def find_seller_by_display_id(request, display_id):
 # --- Catalog (Event) service methods ---
 
 
-def list_catalogs(request, page=1, page_size=25, seller_id=None, use_cache=True, **filters):
+def list_catalogs(request, page=1, page_size=25, seller_id=None, use_cache=True, future_only=True, **filters):
     if seller_id is not None and not filters:
         cache_key = f"{CATALOGS_CACHE_KEY_PREFIX}{seller_id}"
         if use_cache:
@@ -119,14 +119,23 @@ def list_catalogs(request, page=1, page_size=25, seller_id=None, use_cache=True,
             c for c in result.items
             if c.start_date and c.start_date.date() >= today
         ]
-        projected = [
+        projected_future = [
             {"id": c.id, "title": c.title, "customer_catalog_id": c.customer_catalog_id,
              "start_date": c.start_date.isoformat() if c.start_date else None}
             for c in future_items
         ]
-        safe_cache_set(cache_key, projected)
+        safe_cache_set(cache_key, projected_future)
+
+        if future_only:
+            return_items = projected_future
+        else:
+            return_items = [
+                {"id": c.id, "title": c.title, "customer_catalog_id": c.customer_catalog_id,
+                 "start_date": c.start_date.isoformat() if c.start_date else None}
+                for c in result.items
+            ]
         items = []
-        for d in projected:
+        for d in return_items:
             if d.get("start_date"):
                 d["start_date"] = datetime.fromisoformat(d["start_date"])
             items.append(SimpleNamespace(**d))

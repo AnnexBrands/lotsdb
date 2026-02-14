@@ -55,6 +55,7 @@ def seller_list(request):
                 context["selected_seller_id"] = selected_seller_id
                 events_result = services.list_catalogs(
                     request, page=1, page_size=50, seller_id=selected_seller_id,
+                    future_only=False,
                 )
                 context["hydrate_seller"] = seller
                 context["hydrate_events"] = events_result.items

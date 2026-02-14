@@ -709,7 +709,7 @@ class TestPanelFilterContract:
         response = seller_events_panel(request, seller_id=1)
 
         assert response.status_code == 200
-        mock_catalogs.assert_called_once_with(request, page=1, page_size=200, seller_id=1, use_cache=True, Title="Test")
+        mock_catalogs.assert_called_once_with(request, page=1, page_size=200, seller_id=1, use_cache=True, future_only=False, Title="Test")
 
     @patch("catalog.views.panels.services.list_sellers")
     def test_sellers_panel_contains_filter_form(self, mock_list, factory):
@@ -1379,6 +1379,10 @@ class TestSWRContract:
         assert "Fresh Event" in content
         assert "fresh=1" not in content
         mock_cache_get.assert_not_called()
+        mock_catalogs.assert_called_once_with(
+            request, page=1, page_size=200, seller_id=1,
+            use_cache=False, future_only=False,
+        )
 
     @patch("catalog.views.panels.services.list_sellers")
     @patch("catalog.views.panels.services.list_catalogs")
@@ -1398,6 +1402,10 @@ class TestSWRContract:
         content = response.content.decode()
         assert "API Event" in content
         assert 'data-swr-refresh' not in content
+        mock_catalogs.assert_called_once_with(
+            request, page=1, page_size=200, seller_id=1,
+            use_cache=True, future_only=False,
+        )
 
     @patch("catalog.views.panels.services.list_sellers")
     @patch("catalog.views.panels.services.list_catalogs")
@@ -1433,3 +1441,7 @@ class TestSWRContract:
         response = seller_events_panel(request, seller_id=1)
 
         assert "HX-Push-Url" not in response
+        mock_catalogs.assert_called_once_with(
+            request, page=1, page_size=200, seller_id=1,
+            use_cache=False, future_only=False,
+        )

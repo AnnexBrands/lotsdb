@@ -176,7 +176,7 @@ def seller_events_panel(request, seller_id):
         try:
             all_result = services.list_catalogs(
                 request, page=1, page_size=200, seller_id=seller_id,
-                use_cache=not is_fresh, **filters,
+                use_cache=not is_fresh, future_only=False, **filters,
             )
         except ABConnectError:
             logger.exception("Failed to load events for seller %s", seller_id)
@@ -257,7 +257,7 @@ def event_lots_panel(request, event_id):
         # Resolve seller from event data for OOB re-render and URL push
         seller_id = event.sellers[0].id if event.sellers else None
         if seller_id:
-            events_result = services.list_catalogs(request, page=1, page_size=50, seller_id=seller_id)
+            events_result = services.list_catalogs(request, page=1, page_size=50, seller_id=seller_id, future_only=False)
         else:
             events_result = None
     except ABConnectError:

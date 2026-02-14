@@ -91,7 +91,7 @@ A staff member clicks a seller. If cached events exist for that seller, the even
 **Acceptance Scenarios**:
 
 1. **Given** cached events exist for a seller, **When** the user clicks that seller, **Then** cached events display immediately with no loading indicator.
-2. **Given** cached events are displayed, **When** the background server fetch completes, **Then** the panel content is replaced with the fresh server data.
+2. **Given** cached events are displayed, **When** the background server fetch completes, **Then** the panel content is replaced with the fresh server data (all events — past and future — not just future-only).
 3. **Given** cached events are displayed and the background fetch returns different data (e.g., a new event was added), **Then** the panel updates to show the new data.
 4. **Given** no cached events exist for a seller, **When** the user clicks that seller, **Then** the loading skeleton remains visible until the server responds — the skeleton is never cleared to show empty content.
 5. **Given** cached events are displayed and the background fetch fails (server error), **Then** the cached data remains visible — no error shown to the user.
@@ -115,7 +115,7 @@ A staff member clicks a seller. If cached events exist for that seller, the even
 - **FR-005**: Existing graceful fallback behavior MUST be preserved — the application continues to function when the cache server is unavailable.
 - **FR-006**: Skeleton loading placeholders MUST show 15 rows instead of 3.
 - **FR-007**: When cached events exist for a seller, the system MUST display them immediately upon seller click, with no loading skeleton.
-- **FR-008**: The system MUST simultaneously fetch fresh events from the server in the background after displaying cached results.
+- **FR-008**: The system MUST simultaneously fetch all events (past and future) from the server in the background after displaying cached results. The cache is hydrated with future-only events, but the fresh response displays all events.
 - **FR-009**: When the background fetch completes, the events panel MUST seamlessly replace its content with the fresh server data.
 - **FR-010**: If the background fetch fails, the cached data MUST remain visible with no error shown to the user.
 - **FR-011**: If the user navigates to a different seller before the background fetch completes, the stale response MUST NOT replace the current panel content.
