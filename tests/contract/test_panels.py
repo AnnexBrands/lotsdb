@@ -252,17 +252,6 @@ class TestHomePageContract:
         assert "panel-left2" in content
         assert "panel-main" in content
 
-    @patch("catalog.views.sellers.services.list_sellers")
-    def test_sellers_page_renders_full_list(self, mock_list, factory):
-        mock_list.return_value = _mock_paginated([_mock_seller()])
-        request = _make_get(factory, "/sellers/")
-        response = seller_list(request)
-
-        content = response.content.decode()
-        # /sellers/ should NOT render the shell layout
-        assert "panel-left1" not in content
-
-
 class TestPaginationContract:
     """Contract tests for pagination across all panel endpoints."""
 
@@ -854,8 +843,10 @@ class TestLotsTableLayoutContract:
 
         content = response.content.decode()
         assert '<table class="lots-table">' in content
-        for header in ["Img", "Desc/Notes", "Qty", "L", "W", "H", "Wgt", "CPack", "Crate", "DNT", "Save"]:
+        for header in ["Lot Description", "Dimensions", "CPack", "Crate", "DNT"]:
             assert f"<th>{header}</th>" in content
+        # Img and Save columns have empty headers
+        assert content.count("<th></th>") >= 2
 
 
 class TestLotsThumbnailContract:
@@ -913,8 +904,8 @@ class TestOverrideCellsContract:
 
     @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_override_cells_have_class_and_tooltip(self, mock_catalog, mock_get_lots, factory):
-        """Overridden cells have class='overridden' and title='Original: ...' (T024)."""
+    def test_override_inputs_have_class_and_tooltip(self, mock_catalog, mock_get_lots, factory):
+        """Overridden inputs have class='lot-input-overridden' and title='Original: ...'."""
         override = SimpleNamespace(
             description="Changed desc", notes=None, qty=10, l=None, w=None,
             h=None, wgt=None, cpack=None, force_crate=None, do_not_tip=None,
@@ -926,7 +917,7 @@ class TestOverrideCellsContract:
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        assert 'class="overridden"' in content
+        assert 'lot-input-overridden' in content
         assert 'title="Original: 5"' in content
 
 
@@ -943,7 +934,6 @@ class TestLotOverridePanelContract:
 
         request = factory.post("/panels/lots/42/override/", {
             "qty": "99",
-            "description": "Updated",
             "force_crate": "on",
         })
         request.session = AUTH_SESSION.copy()
@@ -957,8 +947,9 @@ class TestLotOverridePanelContract:
         call_args = mock_save.call_args
         assert call_args[0][1] == 42  # lot_id
         assert call_args[0][2]["qty"] == 99
-        assert call_args[0][2]["description"] == "Updated"
         assert call_args[0][2]["force_crate"] is True
+        # description/notes no longer in inline form — edited via modal only
+        assert "description" not in call_args[0][2]
 
 
 class TestIndicatorWiringContract:

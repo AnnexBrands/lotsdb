@@ -94,13 +94,29 @@ def get_lots_for_event(request, lot_ids):
 
 
 def save_lot_override(request, lot_id, override_data):
-    """Update a lot's overriden_data with new override values."""
+    """Update a lot's overriden_data, merging with existing overrides to preserve fields not in override_data."""
     from ABConnect.api.models.catalog import UpdateLotRequest, LotDataDto
 
     api = get_catalog_api(request)
     lot = api.lots.get(lot_id)
 
-    override = LotDataDto(**override_data)
+    # Merge: start with existing override values, then overlay new values on top.
+    # This prevents inline saves from clobbering description/notes overrides
+    # and modal text saves from clobbering dimension/flag overrides.
+    merged = {}
+    existing = lot.overriden_data[0] if lot.overriden_data else None
+    if existing:
+        for attr in (
+            "qty", "l", "w", "h", "wgt", "value", "cpack",
+            "description", "notes", "item_id", "force_crate",
+            "noted_conditions", "do_not_tip", "commodity_id",
+        ):
+            val = getattr(existing, attr, None)
+            if val is not None:
+                merged[attr] = val
+    merged.update(override_data)
+
+    override = LotDataDto(**merged)
     update_req = UpdateLotRequest(
         customer_item_id=lot.customer_item_id,
         image_links=[img.link for img in lot.image_links] if lot.image_links else [],

@@ -29,3 +29,42 @@ def display_val(value):
     if isinstance(value, bool):
         return "Yes" if value else "No"
     return value
+
+
+@register.filter
+def format_number(value):
+    """Format a number: int if whole, decimal if fractional, empty if None."""
+    if value is None:
+        return ""
+    try:
+        f = float(value)
+        return str(int(f)) if f == int(f) else str(f)
+    except (ValueError, TypeError):
+        return str(value)
+
+
+CPACK_MAP = {
+    "1": ("NF", "cpack-nf"),
+    "2": ("LF", "cpack-lf"),
+    "3": ("F", "cpack-f"),
+    "4": ("VF", "cpack-vf"),
+    "PBO": ("PBO", "cpack-pbo"),
+}
+
+
+@register.filter
+def cpack_label(value):
+    """Return the display label for a cpack value."""
+    if value is None or value == "":
+        return "—"
+    label, _ = CPACK_MAP.get(str(value), (str(value), ""))
+    return label
+
+
+@register.filter
+def cpack_class(value):
+    """Return the CSS class for a cpack value."""
+    if value is None or value == "":
+        return ""
+    _, cls = CPACK_MAP.get(str(value), ("", ""))
+    return cls

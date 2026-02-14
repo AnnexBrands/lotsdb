@@ -158,6 +158,21 @@
         });
     }
 
+    // --- Gallery thumbnail navigation ---
+    window.scrollToGalleryImage = function(index) {
+        var gallery = document.querySelector('.lot-gallery');
+        if (!gallery) return;
+        var imgs = gallery.querySelectorAll('img');
+        if (imgs[index]) {
+            imgs[index].scrollIntoView({behavior: 'smooth', inline: 'start', block: 'nearest'});
+        }
+        // Update active thumbnail
+        var thumbs = document.querySelectorAll('.lot-gallery-thumb');
+        thumbs.forEach(function(t, i) {
+            t.classList.toggle('active', i === index);
+        });
+    };
+
     // --- Pagination: jump-to-page ---
     document.body.addEventListener('click', function(e) {
         var display = e.target.closest('.page-display');
@@ -237,38 +252,53 @@
         return tr;
     }
 
-    // Mark row dirty on input/change
-    document.body.addEventListener('input', function(e) {
-        var tr = getLotRow(e.target);
-        if (!tr) return;
+    // Mark row dirty on input/change and reset 15s inactivity timer
+    function markDirty(tr) {
         tr.dataset.dirty = '1';
         var btn = tr.querySelector('.btn-icon');
         if (btn) { btn.classList.add('save-dirty'); btn.classList.remove('save-clean'); }
+        // Reset 15s inactivity timer
+        if (tr._inactivityTimer) clearTimeout(tr._inactivityTimer);
+        tr._inactivityTimer = setTimeout(function() {
+            tr._inactivityTimer = null;
+            if (tr.dataset.dirty === '1') htmx.trigger(tr, 'submit');
+        }, 15000);
+    }
+
+    document.body.addEventListener('input', function(e) {
+        var tr = getLotRow(e.target);
+        if (tr) markDirty(tr);
     });
     document.body.addEventListener('change', function(e) {
         var tr = getLotRow(e.target);
-        if (!tr) return;
-        tr.dataset.dirty = '1';
-        var btn = tr.querySelector('.btn-icon');
-        if (btn) { btn.classList.add('save-dirty'); btn.classList.remove('save-clean'); }
+        if (tr) markDirty(tr);
     });
 
-    // Debounced auto-save on row blur
+    // CPack select color update on change
+    var cpackClassMap = {'1':'cpack-nf','2':'cpack-lf','3':'cpack-f','4':'cpack-vf','PBO':'cpack-pbo'};
+    document.body.addEventListener('change', function(e) {
+        if (e.target.name !== 'cpack' || e.target.tagName !== 'SELECT') return;
+        var sel = e.target;
+        Object.keys(cpackClassMap).forEach(function(k) { sel.classList.remove(cpackClassMap[k]); });
+        var cls = cpackClassMap[sel.value];
+        if (cls) sel.classList.add(cls);
+    });
+
+    // Immediate save on row blur (focus leaving the row entirely)
     document.body.addEventListener('focusout', function(e) {
         var tr = getLotRow(e.target);
         if (!tr || tr.dataset.dirty !== '1') return;
-        // Check if focus is moving to another element in the same row
         setTimeout(function() {
             var active = document.activeElement;
             if (active && tr.contains(active)) return;
-            tr._autoSaveTimer = setTimeout(function() {
-                tr._autoSaveTimer = null;
-                if (tr.dataset.dirty === '1') htmx.trigger(tr, 'submit');
-            }, 2000);
+            // Cancel inactivity timer — blur save takes over
+            if (tr._inactivityTimer) { clearTimeout(tr._inactivityTimer); tr._inactivityTimer = null; }
+            if (tr._autoSaveTimer) { clearTimeout(tr._autoSaveTimer); tr._autoSaveTimer = null; }
+            if (tr.dataset.dirty === '1') htmx.trigger(tr, 'submit');
         }, 0);
     });
 
-    // Cancel auto-save if focus returns to the row
+    // Cancel timers if focus returns to the row
     document.body.addEventListener('focusin', function(e) {
         var tr = getLotRow(e.target);
         if (tr && tr._autoSaveTimer) {
@@ -277,27 +307,54 @@
         }
     });
 
-    // Clear timer on immediate save click
+    // Clear timers on immediate save click
     document.body.addEventListener('click', function(e) {
         if (!e.target.closest('.btn-icon[type="submit"]')) return;
         var tr = getLotRow(e.target);
-        if (tr && tr._autoSaveTimer) {
-            clearTimeout(tr._autoSaveTimer);
-            tr._autoSaveTimer = null;
+        if (tr) {
+            if (tr._autoSaveTimer) { clearTimeout(tr._autoSaveTimer); tr._autoSaveTimer = null; }
+            if (tr._inactivityTimer) { clearTimeout(tr._inactivityTimer); tr._inactivityTimer = null; }
         }
     });
 
-    // Mark row clean after successful HTMX swap
+    // Concurrent save queueing: prevent overlapping saves for the same lot
+    document.body.addEventListener('htmx:beforeRequest', function(e) {
+        var tr = getLotRow(e.detail.elt);
+        if (!tr) return;
+        if (tr.dataset.saving === '1') {
+            // A save is already in flight — queue this one
+            e.preventDefault();
+            tr._pendingSave = true;
+            return;
+        }
+        tr.dataset.saving = '1';
+    });
+
+    // Mark row clean after successful HTMX swap, fire queued saves
     document.body.addEventListener('htmx:afterSwap', function(e) {
         var tr = e.detail.target;
         if (!tr || !tr.id || !tr.id.startsWith('lot-row-')) return;
+        tr.dataset.saving = '';
         tr.dataset.dirty = '';
+        if (tr._inactivityTimer) { clearTimeout(tr._inactivityTimer); tr._inactivityTimer = null; }
         var btn = tr.querySelector('.btn-icon');
         if (btn) {
             btn.classList.remove('save-dirty');
             btn.classList.add('save-clean');
             setTimeout(function() { btn.classList.remove('save-clean'); }, 3000);
         }
+        // Fire queued save if there's a pending one
+        if (tr._pendingSave) {
+            tr._pendingSave = false;
+            markDirty(tr);
+            htmx.trigger(tr, 'submit');
+        }
+    });
+
+    // Clear saving flag on request error too
+    document.body.addEventListener('htmx:responseError', function(e) {
+        var tr = getLotRow(e.detail.elt);
+        if (tr) tr.dataset.saving = '';
     });
 })();
 </script>

@@ -268,8 +268,6 @@ _LOT_DETAIL_FIELDS = [
     ("Weight", "wgt", False),
     ("Value", "value", False),
     ("Case/Pack", "cpack", False),
-    ("Description", "description", False),
-    ("Notes", "notes", False),
     ("Conditions", "noted_conditions", False),
     ("Commodity ID", "commodity_id", False),
     ("Force Crate", "force_crate", True),
@@ -360,11 +358,66 @@ def lot_detail_panel(request, lot_id):
         })
 
     rows, has_override = _build_detail_rows(lot)
+    # Compute effective description/notes (override if present, else initial)
+    initial = lot.initial_data
+    override = lot.overriden_data[0] if lot.overriden_data else None
+    override_desc = getattr(override, "description", None) if override else None
+    lot_description = override_desc if override_desc is not None else (getattr(initial, "description", None) or "")
+    override_notes = getattr(override, "notes", None) if override else None
+    lot_notes = override_notes if override_notes is not None else (getattr(initial, "notes", None) or "")
     return render(request, "catalog/partials/lot_detail_modal.html", {
         "lot": lot,
         "has_override": has_override,
         "rows": rows,
+        "lot_description": lot_description,
+        "lot_notes": lot_notes,
     })
+
+
+def lot_text_save(request, lot_id):
+    """Handle POST to save description/notes from the modal, return OOB table row."""
+    if request.method != "POST":
+        return render(request, "catalog/partials/panel_error.html", {
+            "error_message": "Method not allowed",
+            "retry_url": "/",
+            "retry_target": "#panel-main-content",
+        }, status=405)
+
+    override_data = {}
+    for field in ("description", "notes"):
+        if field in request.POST:
+            override_data[field] = request.POST[field]
+
+    if not override_data:
+        return render(request, "catalog/partials/panel_error.html", {
+            "error_message": "No fields to save",
+            "retry_url": "/",
+            "retry_target": "#panel-main-content",
+        }, status=400)
+
+    try:
+        services.save_lot_override(request, lot_id, override_data)
+        lot = services.get_lot(request, lot_id)
+        lot_rows = build_lot_table_rows([lot])
+        response = render(request, "catalog/partials/lots_table_row.html", {
+            "row": lot_rows[0],
+            "oob": True,
+        })
+        response["HX-Trigger"] = json.dumps({
+            "showToast": {"message": "Saved", "type": "success"},
+        })
+        return response
+    except ABConnectError:
+        logger.exception("Failed to save text for lot %s", lot_id)
+        response = render(request, "catalog/partials/panel_error.html", {
+            "error_message": "Could not save",
+            "retry_url": f"/panels/lots/{lot_id}/detail/",
+            "retry_target": "#lot-modal-body",
+        })
+        response["HX-Trigger"] = json.dumps({
+            "showToast": {"message": "Could not save", "type": "error"},
+        })
+        return response
 
 
 def lot_override_panel(request, lot_id):
@@ -384,12 +437,8 @@ def lot_override_panel(request, lot_id):
                 override_data[field] = float(val) if "." in val else int(val)
             except (ValueError, TypeError):
                 pass
-    # Notes is not submitted from the inline row form (only editable via detail modal).
-    # Empty/absent values are skipped, so existing notes overrides are preserved.
-    for field in ("description", "notes"):
-        val = request.POST.get(field, "").strip()
-        if val:
-            override_data[field] = val
+    # Description/notes are no longer in the inline form — edited only via the detail modal.
+    # The merge-on-save logic in save_lot_override preserves existing text overrides.
     # Cpack: allow blank to clear the value (submitted from <select> with empty option)
     cpack_val = request.POST.get("cpack", "").strip()
     if "cpack" in request.POST:
