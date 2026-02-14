@@ -163,6 +163,9 @@ def seller_events_panel(request, seller_id):
             "retry_target": "#panel-left2-content",
         })
 
+    # Sort events by start_date descending (most recent first) — FR-011
+    result.items.sort(key=lambda e: e.start_date or "", reverse=True)
+
     paginated = _enrich_pagination(result, page_size)
 
     extra_params = {"selected": seller_id}

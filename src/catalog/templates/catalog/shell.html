@@ -246,6 +246,27 @@
         }
     });
 
+    // --- Skeleton loading for events panel on seller click ---
+    var skeletonHTML = '<div class="skeleton-loading">'
+        + '<div class="skeleton-spinner"><div class="spinner"></div></div>'
+        + '<ul class="skeleton-list">'
+        + '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>'
+        + '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>'
+        + '<li class="skeleton-item"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></li>'
+        + '</ul></div>';
+    var mainEmptyHTML = '<div class="panel-empty">'
+        + '<div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>'
+        + '<p>Select an event to view lots</p></div>';
+
+    document.body.addEventListener('htmx:beforeRequest', function(e) {
+        var target = e.detail.target;
+        if (target && target.id === 'panel-left2-content' && e.detail.elt.classList.contains('panel-item')) {
+            target.innerHTML = skeletonHTML;
+            var mainContent = document.getElementById('panel-main-content');
+            if (mainContent) mainContent.innerHTML = mainEmptyHTML;
+        }
+    });
+
     // --- Row auto-save logic ---
     function getLotRow(el) {
         var tr = el.closest('tr[id^="lot-row-"]');

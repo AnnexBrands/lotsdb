@@ -921,6 +921,91 @@ class TestOverrideCellsContract:
         assert 'title="Original: 5"' in content
 
 
+class TestRealtimeFilterContract:
+    """Contract tests for debounced realtime seller filter (013-sellers-panel-ux US1)."""
+
+    @patch("catalog.views.panels.services.list_sellers")
+    def test_filter_input_has_debounced_trigger(self, mock_list, factory):
+        """Seller filter input has hx-trigger with delay:300ms (FR-001, FR-002)."""
+        mock_list.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/")
+        response = sellers_panel(request)
+
+        content = response.content.decode()
+        assert 'hx-trigger="input changed delay:300ms, search"' in content
+
+    @patch("catalog.views.panels.services.list_sellers")
+    def test_filter_input_has_hx_get(self, mock_list, factory):
+        """Seller filter input has hx-get targeting panel-left1-content."""
+        mock_list.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/")
+        response = sellers_panel(request)
+
+        content = response.content.decode()
+        assert 'hx-get="/panels/sellers/"' in content
+
+    @patch("catalog.views.panels.services.list_sellers")
+    def test_form_does_not_have_hx_get(self, mock_list, factory):
+        """Parent <form> must NOT have hx-get (moved to input)."""
+        mock_list.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/")
+        response = sellers_panel(request)
+
+        content = response.content.decode()
+        # Find the <form> tag and verify it has no hx-get
+        form_start = content.index("<form")
+        form_tag_end = content.index(">", form_start)
+        form_tag = content[form_start:form_tag_end + 1]
+        assert "hx-get" not in form_tag
+
+
+class TestEventsSortContract:
+    """Contract tests for events sort order (013-sellers-panel-ux US2 FR-011)."""
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    def test_events_sorted_by_start_date_descending(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """Events panel renders events in start_date descending order."""
+        events = [
+            _mock_event(id=1, title="Old Event", start_date="2024-01-01"),
+            _mock_event(id=2, title="New Event", start_date="2025-06-15"),
+            _mock_event(id=3, title="Mid Event", start_date="2024-07-01"),
+        ]
+        mock_seller.return_value = _mock_seller()
+        mock_catalogs.return_value = _mock_paginated(events)
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        # New Event (2025) should appear before Mid Event (2024-07) before Old Event (2024-01)
+        new_pos = content.index("New Event")
+        mid_pos = content.index("Mid Event")
+        old_pos = content.index("Old Event")
+        assert new_pos < mid_pos < old_pos
+
+    @patch("catalog.views.panels.services.list_sellers")
+    @patch("catalog.views.panels.services.list_catalogs")
+    @patch("catalog.views.panels.services.get_seller")
+    def test_events_with_none_start_date_sorted_last(self, mock_seller, mock_catalogs, mock_list_sellers, factory):
+        """Events with None start_date sort after events with dates."""
+        events = [
+            _mock_event(id=1, title="No Date Event", start_date=None),
+            _mock_event(id=2, title="Dated Event", start_date="2025-01-01"),
+        ]
+        mock_seller.return_value = _mock_seller()
+        mock_catalogs.return_value = _mock_paginated(events)
+        mock_list_sellers.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/1/events/")
+        response = seller_events_panel(request, seller_id=1)
+
+        content = response.content.decode()
+        dated_pos = content.index("Dated Event")
+        no_date_pos = content.index("No Date Event")
+        assert dated_pos < no_date_pos
+
+
 class TestDimsFloatingLabelsContract:
     """Contract tests for floating labels on dimension inputs (012-dims-input-ux)."""
 
