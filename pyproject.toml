@@ -11,6 +11,7 @@ dependencies = [
     "Django>=5.0,<6.0",
     "ABConnect",
     "python-dotenv>=1.0",
+    "redis>=5.0",
 ]
 
 [project.optional-dependencies]

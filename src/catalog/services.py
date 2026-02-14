@@ -1,10 +1,17 @@
 import logging
+from datetime import date
+from types import SimpleNamespace
 
 from ABConnect import ABConnectAPI
 from django.contrib.auth import login as django_login
 from django.contrib.auth.models import User
 
+from catalog.cache import safe_cache_get, safe_cache_set
+
 logger = logging.getLogger(__name__)
+
+SELLERS_CACHE_KEY = "sellers_all"
+CATALOGS_CACHE_KEY_PREFIX = "catalogs_seller_"
 
 
 def login(request, username, password):
@@ -36,9 +43,41 @@ def is_authenticated(request):
 # --- Seller service methods ---
 
 
+def _make_paginated(items, page, page_size):
+    """Build a SimpleNamespace mimicking PaginatedList from an in-memory list."""
+    total = len(items)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    start = (page - 1) * page_size
+    page_items = items[start:start + page_size]
+    return SimpleNamespace(
+        items=page_items,
+        page_number=page,
+        total_pages=total_pages,
+        total_items=total,
+        has_previous_page=page > 1,
+        has_next_page=page < total_pages,
+    )
+
+
 def list_sellers(request, page=1, page_size=25, **filters):
+    if filters:
+        api = get_catalog_api(request)
+        return api.sellers.list(page_number=page, page_size=page_size, **filters)
+
+    cached = safe_cache_get(SELLERS_CACHE_KEY)
+    if cached is not None:
+        items = [SimpleNamespace(**d) for d in cached]
+        return _make_paginated(items, page, page_size)
+
     api = get_catalog_api(request)
-    return api.sellers.list(page_number=page, page_size=page_size, **filters)
+    result = api.sellers.list(page_number=1, page_size=500)
+    projected = [
+        {"id": s.id, "name": s.name, "customer_display_id": s.customer_display_id}
+        for s in result.items
+    ]
+    safe_cache_set(SELLERS_CACHE_KEY, projected)
+    items = [SimpleNamespace(**d) for d in projected]
+    return _make_paginated(items, page, page_size)
 
 
 def get_seller(request, seller_id):
@@ -59,6 +98,29 @@ def find_seller_by_display_id(request, display_id):
 
 
 def list_catalogs(request, page=1, page_size=25, seller_id=None, **filters):
+    if seller_id is not None and not filters:
+        cache_key = f"{CATALOGS_CACHE_KEY_PREFIX}{seller_id}"
+        cached = safe_cache_get(cache_key)
+        if cached is not None:
+            items = [SimpleNamespace(**d) for d in cached]
+            return _make_paginated(items, 1, len(items) or 1)
+
+        api = get_catalog_api(request)
+        result = api.catalogs.list(page_number=1, page_size=200, SellerIds=seller_id)
+        today = date.today()
+        future_items = [
+            c for c in result.items
+            if c.start_date and c.start_date.date() >= today
+        ]
+        projected = [
+            {"id": c.id, "title": c.title, "customer_catalog_id": c.customer_catalog_id,
+             "start_date": str(c.start_date)}
+            for c in future_items
+        ]
+        safe_cache_set(cache_key, projected)
+        items = [SimpleNamespace(**d) for d in projected]
+        return _make_paginated(items, 1, len(items) or 1)
+
     api = get_catalog_api(request)
     if seller_id is not None:
         filters["SellerIds"] = seller_id
