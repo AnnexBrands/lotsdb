@@ -252,6 +252,8 @@ def event_lots_panel(request, event_id):
         "selected_event_id": event_id,
     }
     if events_result:
+        # Sort events by start_date descending (most recent first) — FR-008
+        events_result.items.sort(key=lambda e: e.start_date or "", reverse=True)
         context["oob_events"] = events_result.items
         context["oob_events_paginated"] = events_result
         context["oob_seller_id"] = seller_id

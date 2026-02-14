@@ -258,12 +258,35 @@
         + '<div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>'
         + '<p>Select an event to view lots</p></div>';
 
+    // --- Skeleton loading for lots panel on event click ---
+    var lotsSkeletonRow = '<tr class="skeleton-table-row">'
+        + '<td><div class="skeleton-thumb"></div></td>'
+        + '<td><div class="skeleton-bar" style="width:60%;height:0.8125rem;margin-bottom:0.375rem"></div><div class="skeleton-bar" style="width:40%;height:0.625rem"></div></td>'
+        + '<td><div class="skeleton-dims"><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div></div></td>'
+        + '<td><div class="skeleton-bar" style="width:2.5rem;height:0.75rem"></div></td>'
+        + '<td><div class="skeleton-bar" style="width:1rem;height:1rem;border-radius:2px"></div></td>'
+        + '<td><div class="skeleton-bar" style="width:1rem;height:1rem;border-radius:2px"></div></td>'
+        + '<td></td></tr>';
+    var lotsSkeletonHTML = '<table class="lots-table"><thead><tr>'
+        + '<th></th><th>Lot Description</th>'
+        + '<th style="text-align:center">Dimensions</th>'
+        + '<th style="text-align:center">CPack</th>'
+        + '<th style="text-align:center">Crate</th>'
+        + '<th style="text-align:center">DNT</th>'
+        + '<th></th></tr></thead><tbody>'
+        + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
+        + '</tbody></table>';
+
     document.body.addEventListener('htmx:beforeRequest', function(e) {
         var target = e.detail.target;
         if (target && target.id === 'panel-left2-content' && e.detail.elt.classList.contains('panel-item')) {
             target.innerHTML = skeletonHTML;
             var mainContent = document.getElementById('panel-main-content');
             if (mainContent) mainContent.innerHTML = mainEmptyHTML;
+        }
+        // Show lots skeleton when clicking an event (panel-item inside events panel)
+        if (target && target.id === 'panel-main-content' && e.detail.elt.closest && e.detail.elt.closest('#panel-left2')) {
+            target.innerHTML = lotsSkeletonHTML;
         }
     });
 

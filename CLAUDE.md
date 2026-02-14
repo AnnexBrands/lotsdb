@@ -14,6 +14,8 @@ Auto-generated from all feature plans. Last updated: 2026-02-10
 - SQLite3 (sessions + Django User table via `django.contrib.auth`) (010-access-control)
 - Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), Poppins font (Google Fonts CDN — new) (011-lots-table-ux-overhaul)
 - SQLite3 (sessions + Django User table) — no changes (011-lots-table-ux-overhaul)
+- Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) + No new dependencies — uses existing skeleton CSS classes and JS event listeners (014-lots-skeleton-ux)
+- N/A — no backend changes (014-lots-skeleton-ux)
 
 - Python 3.14, Django 5 + Django 5, HTMX (CDN), ABConnectTools 0.2.1 (editable install) (001-auction-catalog-manager)
 
@@ -33,9 +35,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.14, Django 5: Follow standard conventions
 
 ## Recent Changes
+- 014-lots-skeleton-ux: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install) + No new dependencies — uses existing skeleton CSS classes and JS event listeners
 - 013-sellers-panel-ux: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 - 012-dims-input-ux: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
-- 011-lots-table-ux-overhaul: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), Poppins font (Google Fonts CDN — new)
 
 
 <!-- MANUAL ADDITIONS START -->
