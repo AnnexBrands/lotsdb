@@ -167,8 +167,14 @@ tbody tr:hover { background: #f8fafc; }
 .lot-dims { display: flex; align-items: flex-end; gap: 0.125rem; flex-wrap: nowrap; }
 .lot-dims-field { display: flex; flex-direction: column; align-items: center; gap: 0; }
 .lot-dims-label { font-size: 0.5625rem; font-weight: 400; color: #94a3b8; line-height: 1; user-select: none; }
-.lot-dims-input { min-width: 5ch; width: auto; text-align: right; }
-.lot-dims-wgt { min-width: 6ch; width: auto; text-align: right; }
+.lot-dims-input { width: 4.5ch; text-align: right; }
+.lot-dims-wgt { width: 5.5ch; text-align: right; }
+/* Hide native number spinners */
+.lot-dims-input::-webkit-inner-spin-button,
+.lot-dims-input::-webkit-outer-spin-button,
+.lot-dims-wgt::-webkit-inner-spin-button,
+.lot-dims-wgt::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.lot-dims-input, .lot-dims-wgt { -moz-appearance: textfield; }
 .lot-dims-sep { flex-shrink: 0; user-select: none; color: #94a3b8; font-weight: 400; font-size: 0.625rem; align-self: flex-end; padding-bottom: 0.2rem; }
 .lots-table td { border: none; border-bottom: 1px solid #f1f5f9; }
 .cpack-badge { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 0.75rem; letter-spacing: 0.02em; }
@@ -178,10 +184,10 @@ tbody tr:hover { background: #f8fafc; }
 .cpack-vf { color: #dc2626; }
 .cpack-pbo { color: #7c3aed; }
 .lots-table input[type="text"],
-.lots-table input[type="number"] { padding: 0.2rem 0.35rem; border: none; border-radius: 3px; font-size: 0.75rem; background: transparent; color: #1e293b; }
+.lots-table input[type="number"] { padding: 0.2rem 0.35rem; border: 1px solid transparent; border-radius: 3px; font-size: 0.8125rem; background: transparent; color: #1e293b; }
 .lots-table input[type="text"]:focus,
 .lots-table input[type="number"]:focus,
-.lots-table select:focus { outline: none; border: 1px solid #2563eb; border-radius: 3px; background: #fff; }
+.lots-table select:focus { outline: none; border: 1px solid transparent; border-radius: 3px; background: #eff6ff; }
 .lots-table select { padding: 0.2rem 0.35rem; border: none; background: transparent; font-size: 0.75rem; color: #1e293b; cursor: pointer; }
 .lot-input-num { width: 52px; text-align: right; }
 
@@ -236,6 +242,16 @@ tbody tr:hover { background: #f8fafc; }
 
 /* === Screen Reader Only === */
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* === Skeleton Loading === */
+.skeleton-loading { padding: 1.5rem 1rem; }
+.skeleton-spinner { display: flex; justify-content: center; margin-bottom: 1.25rem; }
+.skeleton-list { list-style: none; margin: 0; padding: 0; }
+.skeleton-item { padding: 0.5rem 0.75rem 0.5rem 1rem; border-bottom: 1px solid #f1f5f9; }
+.skeleton-bar { border-radius: 4px; background: #e2e8f0; animation: skeleton-pulse 1.5s ease-in-out infinite; }
+.skeleton-title { width: 60%; height: 0.8125rem; margin-bottom: 0.5rem; }
+.skeleton-meta { width: 40%; height: 0.625rem; }
+@keyframes skeleton-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 /* === Mobile Back Button === */
 .mobile-back-btn { display: none; align-items: center; gap: 0.35rem; padding: 0.4rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.8rem; color: #475569; cursor: pointer; position: fixed; top: 60px; left: 0.5rem; z-index: 20; }

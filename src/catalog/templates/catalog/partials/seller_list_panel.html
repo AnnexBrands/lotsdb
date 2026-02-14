@@ -1,8 +1,13 @@
 <div class="panel-header">
-    <form class="panel-filter" hx-get="/panels/sellers/" hx-target="#panel-left1-content" hx-swap="innerHTML" hx-indicator="#panel-left1 .htmx-indicator">
+    <form class="panel-filter" onsubmit="return false">
         <input type="text" name="name" class="panel-filter-input" value="{{ filter_name }}"
                placeholder="{% if selected_seller_id and selected_seller_name %}Selected: {{ selected_seller_name }}{% else %}Filter sellers...{% endif %}"
-               autocomplete="off">
+               autocomplete="off"
+               hx-get="/panels/sellers/"
+               hx-target="#panel-left1-content"
+               hx-swap="innerHTML"
+               hx-trigger="input changed delay:300ms, search"
+               hx-indicator="#panel-left1 .htmx-indicator">
         {% if selected_seller_id %}<input type="hidden" name="selected" value="{{ selected_seller_id }}">{% endif %}
         <span class="panel-count">{{ paginated.total_items }}</span>
     </form>
