@@ -164,10 +164,12 @@ tbody tr:hover { background: #f8fafc; }
 .btn-icon.save-clean { color: #16a34a; }
 .btn-icon.save-clean:hover { color: #15803d; }
 .lot-input-overridden { border-left: 2px solid #f59e0b !important; padding-left: 0.25rem; }
-.lot-dims { display: flex; align-items: center; gap: 0.125rem; flex-wrap: nowrap; }
-.lot-dims-input { width: 3rem; text-align: right; }
-.lot-dims-wgt { width: 3.5rem; text-align: right; }
-.lot-dims-sep { flex-shrink: 0; user-select: none; color: #64748b; font-size: 0.6875rem; }
+.lot-dims { display: flex; align-items: flex-end; gap: 0.125rem; flex-wrap: nowrap; }
+.lot-dims-field { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.lot-dims-label { font-size: 0.5625rem; font-weight: 400; color: #94a3b8; line-height: 1; user-select: none; }
+.lot-dims-input { min-width: 5ch; width: auto; text-align: right; }
+.lot-dims-wgt { min-width: 6ch; width: auto; text-align: right; }
+.lot-dims-sep { flex-shrink: 0; user-select: none; color: #94a3b8; font-weight: 400; font-size: 0.625rem; align-self: flex-end; padding-bottom: 0.2rem; }
 .lots-table td { border: none; border-bottom: 1px solid #f1f5f9; }
 .cpack-badge { font-family: 'Poppins', sans-serif; font-weight: 900; font-size: 0.75rem; letter-spacing: 0.02em; }
 .cpack-nf { color: #16a34a; }
