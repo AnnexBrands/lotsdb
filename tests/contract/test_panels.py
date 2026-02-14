@@ -921,6 +921,65 @@ class TestOverrideCellsContract:
         assert 'title="Original: 5"' in content
 
 
+class TestDimsFloatingLabelsContract:
+    """Contract tests for floating labels on dimension inputs (012-dims-input-ux)."""
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_each_dim_input_has_floating_label(self, mock_catalog, mock_get_lots, factory):
+        """Each dimension input is wrapped in .lot-dims-field with a .lot-dims-label."""
+        lot = _mock_lot(id=1, description="Test", qty=5, l=10, w=8, h=6, wgt=100)
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        assert content.count("lot-dims-field") >= 5
+        assert content.count("lot-dims-label") >= 5
+        for label in ["Qty", "L", "W", "H", "Wgt"]:
+            assert f'class="lot-dims-label">{label}</span>' in content
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_separator_tokens_include_in_and_lbs(self, mock_catalog, mock_get_lots, factory):
+        """Separator tokens contain @, x, in, and lbs in correct order."""
+        lot = _mock_lot(id=1, description="Test", qty=1, l=4, w=9, h=15, wgt=3)
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        # Verify separator tokens exist
+        for token in ["@", "x", "in", "lbs"]:
+            assert f'class="lot-dims-sep">{token}</span>' in content
+        # Verify "in" appears after H and before weight
+        in_pos = content.index('>in</span>')
+        wgt_pos = content.index('name="wgt"')
+        assert in_pos < wgt_pos
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_override_class_within_dims_field_wrapper(self, mock_catalog, mock_get_lots, factory):
+        """Override class lot-input-overridden still applies inside .lot-dims-field wrapper."""
+        override = SimpleNamespace(
+            description=None, notes=None, qty=10, l=None, w=None,
+            h=None, wgt=None, cpack=None, force_crate=None, do_not_tip=None,
+        )
+        lot = _mock_lot(id=1, description="Test", qty=5, overriden_data=[override])
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        # qty input should have override class and be inside a dims-field wrapper
+        assert "lot-dims-field" in content
+        assert "lot-input-overridden" in content
+        assert 'title="Original: 5"' in content
+
+
 class TestLotOverridePanelContract:
     """Contract tests for POST /panels/lots/{id}/override/ (T025)."""
 
