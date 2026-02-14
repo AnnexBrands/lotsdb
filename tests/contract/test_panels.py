@@ -1,3 +1,4 @@
+from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -6,6 +7,7 @@ from django.test import RequestFactory
 
 from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_panel, lot_override_panel
 from catalog.views.sellers import seller_list
+from catalog import services as svc_module
 from conftest import AUTH_SESSION
 
 _MOCK_STAFF_USER = SimpleNamespace(is_staff=True, is_authenticated=True, pk=1, id=1)
@@ -1173,3 +1175,128 @@ class TestIndicatorWiringContract:
 
         content = response.content.decode()
         assert 'hx-indicator=' in content
+
+
+class TestSellerCacheContract:
+    """Contract tests for seller list caching (015-redis-caching TC-001..TC-003)."""
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_cache_hit_returns_cached_sellers_no_api_call(self, mock_api, mock_get, mock_set, factory):
+        """TC-001: Cache hit returns cached data without API call."""
+        mock_get.return_value = [
+            {"id": 1, "name": "Seller A", "customer_display_id": "SA"},
+            {"id": 2, "name": "Seller B", "customer_display_id": "SB"},
+        ]
+        request = _make_get(factory, "/panels/sellers/")
+        result = svc_module.list_sellers(request)
+
+        mock_api.assert_not_called()
+        assert len(result.items) == 2
+        assert result.items[0].name == "Seller A"
+        assert result.items[1].customer_display_id == "SB"
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_cache_miss_fetches_projects_and_caches(self, mock_api, mock_get, mock_set, factory):
+        """TC-002: Cache miss fetches from API, projects to dicts, populates cache."""
+        mock_get.return_value = None
+        api = mock_api.return_value
+        api.sellers.list.return_value = _mock_paginated([
+            _mock_seller(id=1, name="Seller A", customer_display_id="SA"),
+        ])
+        request = _make_get(factory, "/panels/sellers/")
+        result = svc_module.list_sellers(request)
+
+        api.sellers.list.assert_called_once_with(page_number=1, page_size=500)
+        mock_set.assert_called_once()
+        cached_data = mock_set.call_args[0][1]
+        assert cached_data == [{"id": 1, "name": "Seller A", "customer_display_id": "SA"}]
+        assert result.items[0].name == "Seller A"
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_filter_bypasses_cache(self, mock_api, mock_get, mock_set, factory):
+        """TC-003: Seller filter bypasses cache entirely."""
+        api = mock_api.return_value
+        api.sellers.list.return_value = _mock_paginated([_mock_seller()])
+        request = _make_get(factory, "/panels/sellers/")
+        svc_module.list_sellers(request, Name="foo")
+
+        mock_get.assert_not_called()
+        api.sellers.list.assert_called_once_with(page_number=1, page_size=25, Name="foo")
+
+
+class TestCatalogCacheContract:
+    """Contract tests for catalog list caching (015-redis-caching TC-004..TC-005)."""
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_cache_hit_returns_cached_catalogs_no_api_call(self, mock_api, mock_get, mock_set, factory):
+        """TC-004: Cache hit returns cached catalogs without API call."""
+        mock_get.return_value = [
+            {"id": 7, "title": "Spring Auction", "customer_catalog_id": "SA-2026", "start_date": "2026-03-15"},
+        ]
+        request = _make_get(factory, "/panels/sellers/42/events/")
+        result = svc_module.list_catalogs(request, seller_id=42)
+
+        mock_api.assert_not_called()
+        assert len(result.items) == 1
+        assert result.items[0].title == "Spring Auction"
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_cache_miss_fetches_filters_future_and_caches(self, mock_api, mock_get, mock_set, factory):
+        """TC-005: Cache miss fetches, filters future only, projects, caches."""
+        mock_get.return_value = None
+        api = mock_api.return_value
+        api.catalogs.list.return_value = _mock_paginated([
+            _mock_event(id=1, title="Future", customer_catalog_id="F1", start_date=datetime(2099, 1, 1)),
+            _mock_event(id=2, title="Past", customer_catalog_id="P1", start_date=datetime(2020, 1, 1)),
+        ])
+        request = _make_get(factory, "/panels/sellers/42/events/")
+        result = svc_module.list_catalogs(request, seller_id=42)
+
+        api.catalogs.list.assert_called_once_with(page_number=1, page_size=200, SellerIds=42)
+        mock_set.assert_called_once()
+        cached_data = mock_set.call_args[0][1]
+        assert len(cached_data) == 1
+        assert cached_data[0]["title"] == "Future"
+        assert result.items[0].title == "Future"
+
+
+class TestCacheFallbackContract:
+    """Contract tests for graceful cache unavailability (015-redis-caching TC-006)."""
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_sellers_fallback_on_cache_failure(self, mock_api, mock_get, mock_set, factory):
+        """TC-006: Cache unavailable, sellers still fetched from API."""
+        mock_get.return_value = None  # Cache miss (simulates down or empty)
+        api = mock_api.return_value
+        api.sellers.list.return_value = _mock_paginated([_mock_seller(id=1, name="Fallback")])
+        request = _make_get(factory, "/panels/sellers/")
+        result = svc_module.list_sellers(request)
+
+        assert result.items[0].name == "Fallback"
+
+    @patch("catalog.services.safe_cache_set")
+    @patch("catalog.services.safe_cache_get")
+    @patch("catalog.services.get_catalog_api")
+    def test_catalogs_fallback_on_cache_failure(self, mock_api, mock_get, mock_set, factory):
+        """Cache unavailable, catalogs still fetched from API."""
+        mock_get.return_value = None
+        api = mock_api.return_value
+        api.catalogs.list.return_value = _mock_paginated([
+            _mock_event(id=1, title="Event", start_date=datetime(2099, 1, 1)),
+        ])
+        request = _make_get(factory, "/panels/sellers/42/events/")
+        result = svc_module.list_catalogs(request, seller_id=42)
+
+        assert result.items[0].title == "Event"
