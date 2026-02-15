@@ -396,7 +396,8 @@ def lot_detail_panel(request, lot_id):
             "form": form,
         })
 
-    rows, has_override = _build_detail_rows(lot)
+    lot_rows = build_lot_table_rows([lot])
+    fields = lot_rows[0]["fields"]
     # Compute effective description/notes (override if present, else initial)
     initial = lot.initial_data
     override = lot.overriden_data[0] if lot.overriden_data else None
@@ -406,8 +407,7 @@ def lot_detail_panel(request, lot_id):
     lot_notes = override_notes if override_notes is not None else (getattr(initial, "notes", None) or "")
     return render(request, "catalog/partials/lot_detail_modal.html", {
         "lot": lot,
-        "has_override": has_override,
-        "rows": rows,
+        "fields": fields,
         "lot_description": lot_description,
         "lot_notes": lot_notes,
     })
@@ -485,17 +485,31 @@ def lot_override_panel(request, lot_id):
     for field in ("force_crate", "do_not_tip"):
         override_data[field] = field in request.POST
 
+    from_modal = "from_modal" in request.POST
+
     try:
         services.save_lot_override(request, lot_id, override_data)
         lot = services.get_lot(request, lot_id)
         lot_rows = build_lot_table_rows([lot])
-        return render(request, "catalog/partials/lots_table_row.html", {
+        response = render(request, "catalog/partials/lots_table_row.html", {
             "row": lot_rows[0],
+            "oob": from_modal,
         })
+        if from_modal:
+            response["HX-Trigger"] = json.dumps({
+                "closeModal": True,
+                "showToast": {"message": "Override saved", "type": "success"},
+            })
+        return response
     except ABConnectError:
         logger.exception("Failed to save override for lot %s", lot_id)
-        return render(request, "catalog/partials/panel_error.html", {
+        response = render(request, "catalog/partials/panel_error.html", {
             "error_message": "Could not save override",
             "retry_url": "/",
             "retry_target": "#panel-main-content",
         })
+        if from_modal:
+            response["HX-Trigger"] = json.dumps({
+                "showToast": {"message": "Could not save override", "type": "error"},
+            })
+        return response

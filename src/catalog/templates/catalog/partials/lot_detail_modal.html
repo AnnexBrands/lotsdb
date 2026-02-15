@@ -1,84 +1,127 @@
 {% load catalog_tags %}
 <div data-lot-title="Lot {{ lot.catalogs.0.lot_number|default:lot.id }}">
-    {% if lot.image_links %}
-    <div class="lot-gallery">
-        {% for img in lot.image_links %}
-        <img src="{{ img.link }}" alt="Lot image {{ forloop.counter }}">
-        {% endfor %}
-    </div>
-    {% if lot.image_links|length > 1 %}
-    <div class="lot-gallery-thumbs">
-        {% for img in lot.image_links %}
-        <button type="button" class="lot-gallery-thumb{% if forloop.first %} active{% endif %}" onclick="scrollToGalleryImage({{ forloop.counter0 }})">
-            <img src="{{ img.link }}" alt="">
-        </button>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% else %}
-    <div class="lot-gallery-empty">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-        <span>No images</span>
-    </div>
-    {% endif %}
 
-    <div class="lot-modal-section">
-        <h3>Description</h3>
-        <textarea name="description" class="lot-modal-textarea"
-            hx-post="/panels/lots/{{ lot.id }}/text-save/"
-            hx-trigger="change"
-            hx-swap="none"
-            hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>{{ lot_description }}</textarea>
-    </div>
-
-    <div class="lot-modal-section">
-        <h3>Notes</h3>
-        <textarea name="notes" class="lot-modal-textarea"
-            hx-post="/panels/lots/{{ lot.id }}/text-save/"
-            hx-trigger="change"
-            hx-swap="none"
-            hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>{{ lot_notes }}</textarea>
-    </div>
-
-    <div class="lot-data">
-        <h3>Details</h3>
-        <dl class="meta">
-            <dt>Customer Item ID</dt><dd>{{ lot.customer_item_id|default:"—" }}</dd>
-        </dl>
-        <table>
-            <thead>
-                <tr>
-                    <th>Field</th>
-                    <th>Initial Value</th>
-                    {% if has_override %}<th>Override Value</th>{% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in rows %}
-                <tr>
-                    <td><strong>{{ row.label }}</strong></td>
-                    <td>
-                        {% if row.is_flag %}
-                            {% if row.initial %}<span class="badge badge-flag">{{ row.label }}</span>{% else %}—{% endif %}
-                        {% else %}
-                            {{ row.initial|display_val }}
-                        {% endif %}
-                    </td>
-                    {% if has_override %}
-                    <td class="{% if row.changed %}changed{% endif %}">
-                        {% if row.is_flag %}
-                            {% if row.override %}<span class="badge badge-flag">{{ row.label }}</span>{% else %}—{% endif %}
-                        {% else %}
-                            {{ row.override|display_val }}
-                        {% endif %}
-                    </td>
-                    {% endif %}
-                </tr>
+    <!-- HERO: Gallery + Info + Override Form -->
+    <div class="lot-hero">
+        <div class="lot-gallery">
+            {% if lot.image_links %}
+            <div class="lot-gallery-main">
+                <img id="modal-main-img" src="{{ lot.image_links.0.link }}" alt="Lot image">
+            </div>
+            {% if lot.image_links|length > 1 %}
+            <div class="lot-gallery-thumbs">
+                {% for img in lot.image_links %}
+                <button type="button" class="lot-gallery-thumb{% if forloop.first %} active{% endif %}" data-img-src="{{ img.link }}">
+                    <img src="{{ img.link }}" alt="">
+                </button>
                 {% endfor %}
-            </tbody>
-        </table>
-        <div style="margin-top: 0.75rem;">
-            <button hx-get="/panels/lots/{{ lot.id }}/detail/?edit=1" hx-target="#lot-modal-body" hx-swap="innerHTML" class="btn btn-secondary">Edit Details</button>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="lot-gallery-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span>No images</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="lot-info">
+            <div class="lot-desc-title">{{ lot_description|default:"No description" }}</div>
+            {% if lot_notes %}<div class="lot-desc-notes">{{ lot_notes }}</div>{% endif %}
+
+            <form class="override-row" hx-post="/panels/lots/{{ lot.id }}/override/" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>
+                {% csrf_token %}
+                <input type="hidden" name="from_modal" value="1">
+                <div class="lot-dims lot-dims--refs">
+                    <div class="lot-dims-field"><span class="lot-dims-label">Qty</span><input type="number" name="qty" value="{{ fields.qty.value|format_number }}" class="lot-input lot-dims-input {{ fields.qty.value|dim_error_class }}" onfocus="this.select()"><span class="initial-ref{% if fields.qty|show_ref %} initial-changed{% endif %}">{% if fields.qty|show_ref %}{{ fields.qty.original|format_number }}{% endif %}</span></div>
+                    <span class="lot-dims-sep">@</span>
+                    <div class="lot-dims-field"><span class="lot-dims-label">L</span><input type="number" name="l" value="{{ fields.l.value|format_number }}" class="lot-input lot-dims-input {{ fields.l.value|dim_error_class }}" step="any" onfocus="this.select()"><span class="initial-ref{% if fields.l|show_ref %} initial-changed{% endif %}">{% if fields.l|show_ref %}{{ fields.l.original|format_number }}{% endif %}</span></div>
+                    <span class="lot-dims-sep">x</span>
+                    <div class="lot-dims-field"><span class="lot-dims-label">W</span><input type="number" name="w" value="{{ fields.w.value|format_number }}" class="lot-input lot-dims-input {{ fields.w.value|dim_error_class }}" step="any" onfocus="this.select()"><span class="initial-ref{% if fields.w|show_ref %} initial-changed{% endif %}">{% if fields.w|show_ref %}{{ fields.w.original|format_number }}{% endif %}</span></div>
+                    <span class="lot-dims-sep">x</span>
+                    <div class="lot-dims-field"><span class="lot-dims-label">H</span><input type="number" name="h" value="{{ fields.h.value|format_number }}" class="lot-input lot-dims-input {{ fields.h.value|dim_error_class }}" step="any" onfocus="this.select()"><span class="initial-ref{% if fields.h|show_ref %} initial-changed{% endif %}">{% if fields.h|show_ref %}{{ fields.h.original|format_number }}{% endif %}</span></div>
+                    <span class="lot-dims-sep">in</span>
+                    <span class="lot-dims-sep">,</span>
+                    <div class="lot-dims-field"><span class="lot-dims-label">Wgt</span><input type="number" name="wgt" value="{{ fields.wgt.value|format_number }}" class="lot-input lot-dims-wgt {{ fields.wgt.value|dim_error_class }}" step="any" onfocus="this.select()"><span class="initial-ref{% if fields.wgt|show_ref %} initial-changed{% endif %}">{% if fields.wgt|show_ref %}{{ fields.wgt.original|format_number }}{% endif %}</span></div>
+                    <span class="lot-dims-sep">lbs</span>
+                    <div class="lot-dims-field"><span class="lot-dims-label">CPack</span><select name="cpack" class="lot-input lot-input-sm cpack-badge cpack-field {{ fields.cpack.value|cpack_class }} {{ fields.cpack.value|dim_error_class }}"><option value="">—</option><option value="1"{% if fields.cpack.value == "1" %} selected{% endif %}>NF</option><option value="2"{% if fields.cpack.value == "2" %} selected{% endif %}>LF</option><option value="3"{% if fields.cpack.value == "3" %} selected{% endif %}>F</option><option value="4"{% if fields.cpack.value == "4" %} selected{% endif %}>VF</option><option value="PBO"{% if fields.cpack.value == "PBO" %} selected{% endif %}>PBO</option></select><span class="initial-ref"></span></div>
+                    <div class="lot-dims-field"><span class="lot-dims-label">Crate</span><input type="checkbox" name="force_crate" {% if fields.force_crate.value %}checked{% endif %}><span class="initial-ref"></span></div>
+                    <div class="lot-dims-field"><span class="lot-dims-label">DNT</span><input type="checkbox" name="do_not_tip" {% if fields.do_not_tip.value %}checked{% endif %}><span class="initial-ref"></span></div>
+                </div>
+                <div class="override-actions">
+                    <button type="submit" class="btn-icon override-btn" title="Save override"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+                    <button type="button" class="btn-icon override-btn override-undo" title="Undo changes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10"/></svg></button>
+                </div>
+            </form>
         </div>
     </div>
+
+    <!-- RECOMMENDATION ENGINE (placeholder skeleton) -->
+    <div class="section">
+        <h3>Box Sizing &amp; Pack Options <span class="placeholder-badge">Quoter Pending</span></h3>
+        <div class="quoter-grid">
+            <div class="quoter-card">
+                <div class="quoter-card-label">Minimum</div>
+                <div class="skeleton-bar" style="width:70%;height:1rem;margin:0.375rem auto 0.25rem"></div>
+                <div class="skeleton-bar" style="width:55%;height:0.625rem;margin:0 auto"></div>
+            </div>
+            <div class="quoter-card recommended">
+                <div class="quoter-card-label">Recommended</div>
+                <div class="skeleton-bar" style="width:70%;height:1rem;margin:0.375rem auto 0.25rem"></div>
+                <div class="skeleton-bar" style="width:55%;height:0.625rem;margin:0 auto"></div>
+            </div>
+            <div class="quoter-card">
+                <div class="quoter-card-label">Oversize</div>
+                <div class="skeleton-bar" style="width:70%;height:1rem;margin:0.375rem auto 0.25rem"></div>
+                <div class="skeleton-bar" style="width:55%;height:0.625rem;margin:0 auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RELATED LOTS (placeholder skeleton) -->
+    <div class="section">
+        <h3>Related Lots <span class="future-badge">Similarity Matching</span></h3>
+        <div class="stacks-grid">
+            <div class="stack-column" data-stack="q25">
+                <div class="stack-col-label q25-label"><span class="tag">Q25</span> Low</div>
+                <div class="card-stack">
+                    <div class="stack-card" data-pos="0">
+                        <div class="stack-card-img"><div class="skeleton-bar" style="width:100%;height:100%;border-radius:0"></div></div>
+                        <div class="stack-card-body"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></div>
+                    </div>
+                    <div class="stack-card" data-pos="1">
+                        <div class="stack-card-img"><div class="skeleton-bar" style="width:100%;height:100%;border-radius:0"></div></div>
+                        <div class="stack-card-body"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="stack-column" data-stack="q50">
+                <div class="stack-col-label q50-label"><span class="tag">Q50</span> Median</div>
+                <div class="card-stack">
+                    <div class="stack-card" data-pos="0">
+                        <div class="stack-card-img"><div class="skeleton-bar" style="width:100%;height:100%;border-radius:0"></div></div>
+                        <div class="stack-card-body"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></div>
+                    </div>
+                    <div class="stack-card" data-pos="1">
+                        <div class="stack-card-img"><div class="skeleton-bar" style="width:100%;height:100%;border-radius:0"></div></div>
+                        <div class="stack-card-body"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="stack-column" data-stack="q75">
+                <div class="stack-col-label q75-label"><span class="tag">Q75</span> High</div>
+                <div class="card-stack">
+                    <div class="stack-card" data-pos="0">
+                        <div class="stack-card-img"><div class="skeleton-bar" style="width:100%;height:100%;border-radius:0"></div></div>
+                        <div class="stack-card-body"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></div>
+                    </div>
+                    <div class="stack-card" data-pos="1">
+                        <div class="stack-card-img"><div class="skeleton-bar" style="width:100%;height:100%;border-radius:0"></div></div>
+                        <div class="stack-card-body"><div class="skeleton-bar skeleton-title"></div><div class="skeleton-bar skeleton-meta"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>

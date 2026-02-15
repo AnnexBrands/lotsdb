@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 from django.test import RequestFactory
 
-from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_panel, lot_override_panel
+from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_panel, lot_override_panel, lot_detail_panel
 from catalog.views.sellers import seller_list
 from catalog import services as svc_module
 from conftest import AUTH_SESSION
@@ -905,8 +905,8 @@ class TestOverrideCellsContract:
 
     @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_override_inputs_have_class_and_tooltip(self, mock_catalog, mock_get_lots, factory):
-        """Overridden inputs have class='lot-input-overridden' and title='Original: ...'."""
+    def test_override_inputs_show_initial_ref(self, mock_catalog, mock_get_lots, factory):
+        """Overridden inputs show original value in initial-ref span with initial-changed class."""
         override = SimpleNamespace(
             description="Changed desc", notes=None, qty=10, l=None, w=None,
             h=None, wgt=None, cpack=None, force_crate=None, do_not_tip=None,
@@ -918,8 +918,8 @@ class TestOverrideCellsContract:
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        assert 'lot-input-overridden' in content
-        assert 'title="Original: 5"' in content
+        assert 'initial-changed' in content
+        assert 'initial-ref' in content
 
 
 class TestRealtimeFilterContract:
@@ -1047,8 +1047,8 @@ class TestDimsFloatingLabelsContract:
 
     @patch("catalog.views.panels.services.get_lots_for_event")
     @patch("catalog.views.panels.services.get_catalog")
-    def test_override_class_within_dims_field_wrapper(self, mock_catalog, mock_get_lots, factory):
-        """Override class lot-input-overridden still applies inside .lot-dims-field wrapper."""
+    def test_override_shown_as_initial_ref(self, mock_catalog, mock_get_lots, factory):
+        """Override values show original in initial-ref span with initial-changed class."""
         override = SimpleNamespace(
             description=None, notes=None, qty=10, l=None, w=None,
             h=None, wgt=None, cpack=None, force_crate=None, do_not_tip=None,
@@ -1060,10 +1060,28 @@ class TestDimsFloatingLabelsContract:
         response = event_lots_panel(request, event_id=1)
 
         content = response.content.decode()
-        # qty input should have override class and be inside a dims-field wrapper
+        # qty input should be inside a dims-field wrapper with initial-ref span
         assert "lot-dims-field" in content
-        assert "lot-input-overridden" in content
-        assert 'title="Original: 5"' in content
+        assert "initial-changed" in content
+        assert "lot-input-overridden" not in content
+
+    @patch("catalog.views.panels.services.get_lots_for_event")
+    @patch("catalog.views.panels.services.get_catalog")
+    def test_zero_original_does_not_show_ref(self, mock_catalog, mock_get_lots, factory):
+        """When original value is 0, initial-ref span should be empty (no text)."""
+        override = SimpleNamespace(
+            description=None, notes=None, qty=5, l=None, w=None,
+            h=None, wgt=None, cpack=None, force_crate=None, do_not_tip=None,
+        )
+        lot = _mock_lot(id=1, description="Test", qty=0, overriden_data=[override])
+        mock_catalog.return_value = _mock_event(lots=[lot])
+        mock_get_lots.return_value = [lot]
+        request = _make_get(factory, "/panels/events/1/lots/")
+        response = event_lots_panel(request, event_id=1)
+
+        content = response.content.decode()
+        # qty changed (0→5) but original is 0, so initial-changed should NOT appear
+        assert "initial-changed" not in content
 
 
 class TestLotOverridePanelContract:
@@ -1095,6 +1113,31 @@ class TestLotOverridePanelContract:
         assert call_args[0][2]["force_crate"] is True
         # description/notes no longer in inline form — edited via modal only
         assert "description" not in call_args[0][2]
+
+    @patch("catalog.views.panels.services.get_lot")
+    @patch("catalog.views.panels.services.save_lot_override")
+    def test_lot_override_from_modal_returns_oob_and_close(self, mock_save, mock_get_lot, factory):
+        """POST with from_modal returns OOB row swap and closeModal HX-Trigger."""
+        saved_lot = _mock_lot(id=42, description="Updated", qty=99)
+        mock_save.return_value = None
+        mock_get_lot.return_value = saved_lot
+
+        request = factory.post("/panels/lots/42/override/", {
+            "qty": "99",
+            "force_crate": "on",
+            "from_modal": "1",
+        })
+        request.session = AUTH_SESSION.copy()
+        request.user = _MOCK_STAFF_USER
+        response = lot_override_panel(request, lot_id=42)
+
+        content = response.content.decode()
+        assert response.status_code == 200
+        assert 'hx-swap-oob="outerHTML"' in content
+        import json
+        trigger = json.loads(response["HX-Trigger"])
+        assert trigger["closeModal"] is True
+        assert trigger["showToast"]["type"] == "success"
 
 
 class TestOobEventSortContract:
@@ -1445,3 +1488,111 @@ class TestSWRContract:
             request, page=1, page_size=200, seller_id=1,
             use_cache=False, future_only=False,
         )
+
+
+class TestLotDetailPanelContract:
+    """Contract tests for GET /panels/lots/{id}/detail/ (017-lots-modal-overhaul)."""
+
+    @patch("catalog.views.panels.services.get_lot")
+    def test_lot_detail_panel_returns_fields_context(self, mock_get_lot, factory):
+        """GET returns context with fields dict containing expected keys and structure."""
+        lot = _mock_lot(id=10, qty=5, l=24, w=34, h=115, wgt=85, cpack="3")
+        mock_get_lot.return_value = lot
+
+        request = _make_get(factory, "/panels/lots/10/detail/")
+        response = lot_detail_panel(request, lot_id=10)
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        # Template uses fields dict — check rendered output contains field values
+        assert 'name="qty"' in content
+        assert 'name="l"' in content
+        assert 'name="w"' in content
+        assert 'name="h"' in content
+        assert 'name="wgt"' in content
+        assert 'name="cpack"' in content
+        assert 'name="force_crate"' in content
+        assert 'name="do_not_tip"' in content
+        # Check actual dimension values are rendered
+        assert 'value="5"' in content  # qty
+        assert 'value="24"' in content  # l
+        assert 'value="34"' in content  # w
+
+    @patch("catalog.views.panels.services.get_lot")
+    def test_lot_detail_panel_fields_show_override_diff(self, mock_get_lot, factory):
+        """When override differs from initial, changed fields get overridden class."""
+        override_data = SimpleNamespace(
+            description="Override desc", notes=None, qty=10,
+            l=30, w=40, h=120, wgt=100, cpack="4",
+            force_crate=True, do_not_tip=None,
+        )
+        lot = _mock_lot(id=10, qty=5, l=24, w=34, h=115, wgt=85, cpack="3",
+                        overriden_data=[override_data])
+        mock_get_lot.return_value = lot
+
+        request = _make_get(factory, "/panels/lots/10/detail/")
+        response = lot_detail_panel(request, lot_id=10)
+
+        content = response.content.decode()
+        assert response.status_code == 200
+        # Override values should appear in the rendered form
+        assert 'value="10"' in content  # overridden qty
+        assert 'value="30"' in content  # overridden l
+        # Changed fields show initial-changed class on initial ref
+        assert "initial-changed" in content
+
+    @patch("catalog.views.panels.services.get_lot")
+    def test_lot_detail_panel_description_notes_context(self, mock_get_lot, factory):
+        """lot_description and lot_notes use override when present, initial when not."""
+        lot = _mock_lot(id=10, description="Initial desc", notes="Initial notes")
+        mock_get_lot.return_value = lot
+
+        request = _make_get(factory, "/panels/lots/10/detail/")
+        response = lot_detail_panel(request, lot_id=10)
+
+        content = response.content.decode()
+        assert "Initial desc" in content
+        assert "Initial notes" in content
+
+    @patch("catalog.views.panels.services.get_lot")
+    def test_lot_detail_panel_description_uses_override(self, mock_get_lot, factory):
+        """lot_description uses override description when present."""
+        override_data = SimpleNamespace(
+            description="Override desc", notes="Override notes", qty=None,
+            l=None, w=None, h=None, wgt=None, cpack=None,
+            force_crate=None, do_not_tip=None,
+        )
+        lot = _mock_lot(id=10, description="Initial desc", notes="Initial notes",
+                        overriden_data=[override_data])
+        mock_get_lot.return_value = lot
+
+        request = _make_get(factory, "/panels/lots/10/detail/")
+        response = lot_detail_panel(request, lot_id=10)
+
+        content = response.content.decode()
+        assert "Override desc" in content
+        assert "Override notes" in content
+
+    @patch("catalog.views.panels.services.get_lot")
+    def test_lot_detail_panel_hero_layout_structure(self, mock_get_lot, factory):
+        """Response contains the new hero layout structure with gallery and info sections."""
+        lot = _mock_lot(id=10, description="Test item")
+        mock_get_lot.return_value = lot
+
+        request = _make_get(factory, "/panels/lots/10/detail/")
+        response = lot_detail_panel(request, lot_id=10)
+
+        content = response.content.decode()
+        assert 'class="lot-hero"' in content
+        assert 'class="lot-gallery"' in content
+        assert 'class="lot-info"' in content
+        assert 'class="override-row"' in content
+        # Recommendation section placeholder with skeletons
+        assert "Box Sizing" in content
+        assert "Quoter Pending" in content
+        assert "skeleton-bar" in content
+        # Related lots section placeholder
+        assert "Related Lots" in content
+        assert "Similarity Matching" in content
+        # No textarea elements (display-only desc/notes)
+        assert "<textarea" not in content

@@ -42,12 +42,9 @@
     </div>
     <div id="panel-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 </div>
-<dialog id="lot-modal" aria-labelledby="lot-modal-title">
+<dialog id="lot-modal">
     <div class="modal-container">
-        <div class="modal-header">
-            <h2 id="lot-modal-title">Lot Detail</h2>
-            <button class="modal-close" aria-label="Close">&times;</button>
-        </div>
+        <button class="modal-close" aria-label="Close">&times;</button>
         <div id="lot-modal-body" class="modal-body">
             <div class="modal-loading"><div class="spinner"></div></div>
         </div>
@@ -103,7 +100,6 @@
     // --- Modal logic ---
     var dialog = document.getElementById('lot-modal');
     var modalBody = document.getElementById('lot-modal-body');
-    var modalTitle = document.getElementById('lot-modal-title');
     var loadingHTML = '<div class="modal-loading"><div class="spinner"></div></div>';
 
     if (dialog) {
@@ -117,15 +113,19 @@
             if (e.target === dialog) dialog.close();
         });
 
-        // Open modal after HTMX swaps content into modal body
+        // Open modal after HTMX swaps content into modal body + snapshot form values
         document.body.addEventListener('htmx:afterSwap', function(e) {
             if (e.detail.target === modalBody || e.detail.target.id === 'lot-modal-body') {
-                // Update title from data attribute
-                var firstChild = modalBody.firstElementChild;
-                if (firstChild && firstChild.getAttribute('data-lot-title')) {
-                    modalTitle.textContent = firstChild.getAttribute('data-lot-title');
-                }
                 if (!dialog.open) dialog.showModal();
+                var form = modalBody.querySelector('.override-row');
+                if (form) {
+                    var snap = {};
+                    form.querySelectorAll('input, select').forEach(function(el) {
+                        if (el.type === 'hidden') return;
+                        snap[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+                    });
+                    form._snapshot = snap;
+                }
             }
         });
 
@@ -145,7 +145,6 @@
         // Reset modal body to loading spinner when dialog closes
         dialog.addEventListener('close', function() {
             modalBody.innerHTML = loadingHTML;
-            modalTitle.textContent = 'Lot Detail';
         });
 
         // Before HTMX sends request targeting modal body, show loading spinner
@@ -158,20 +157,100 @@
         });
     }
 
-    // --- Gallery thumbnail navigation ---
-    window.scrollToGalleryImage = function(index) {
-        var gallery = document.querySelector('.lot-gallery');
-        if (!gallery) return;
-        var imgs = gallery.querySelectorAll('img');
-        if (imgs[index]) {
-            imgs[index].scrollIntoView({behavior: 'smooth', inline: 'start', block: 'nearest'});
-        }
-        // Update active thumbnail
-        var thumbs = document.querySelectorAll('.lot-gallery-thumb');
-        thumbs.forEach(function(t, i) {
-            t.classList.toggle('active', i === index);
+    // --- Modal override form dirty tracking ---
+    document.body.addEventListener('input', function(e) {
+        var form = e.target.closest('.override-row');
+        if (form && form.closest('#lot-modal-body')) form.classList.add('dirty');
+    });
+    document.body.addEventListener('change', function(e) {
+        var form = e.target.closest('.override-row');
+        if (form && form.closest('#lot-modal-body')) form.classList.add('dirty');
+    });
+
+    // --- Modal undo: restore snapshot values ---
+    document.body.addEventListener('click', function(e) {
+        var btn = e.target.closest('.override-undo');
+        if (!btn) return;
+        var form = btn.closest('.override-row');
+        if (!form || !form._snapshot) return;
+        var snap = form._snapshot;
+        form.querySelectorAll('input, select').forEach(function(el) {
+            if (el.type === 'hidden') return;
+            if (el.type === 'checkbox') el.checked = snap[el.name] !== undefined ? snap[el.name] : false;
+            else if (snap[el.name] !== undefined) el.value = snap[el.name];
         });
-    };
+        form.classList.remove('dirty');
+        // Re-apply cpack color
+        var cpackSel = form.querySelector('select[name="cpack"]');
+        if (cpackSel) cpackSel.dispatchEvent(new Event('change'));
+    });
+
+    // --- Gallery thumbnail navigation (event-delegated main-image swap) ---
+    document.body.addEventListener('click', function(e) {
+        var thumb = e.target.closest('.lot-gallery-thumb');
+        if (!thumb || !thumb.closest('#lot-modal-body')) return;
+        var src = thumb.getAttribute('data-img-src');
+        if (!src) return;
+        var mainImg = document.getElementById('modal-main-img');
+        if (mainImg) mainImg.src = src;
+        var thumbs = thumb.closest('.lot-gallery-thumbs');
+        if (thumbs) {
+            thumbs.querySelectorAll('.lot-gallery-thumb').forEach(function(t) {
+                t.classList.toggle('active', t === thumb);
+            });
+        }
+    });
+
+    // --- Card stack navigation (event-delegated) ---
+    document.body.addEventListener('click', function(e) {
+        var btn = e.target.closest('.stack-nav-btn');
+        if (!btn || !btn.closest('#lot-modal-body')) return;
+        var col = btn.closest('.stack-column');
+        if (!col) return;
+        var cards = col.querySelectorAll('.stack-card');
+        var counter = col.querySelector('.stack-counter');
+        var upBtn = col.querySelector('[data-dir="up"]');
+        var downBtn = col.querySelector('[data-dir="down"]');
+        var total = cards.length;
+        // Find current front card index
+        var current = 0;
+        cards.forEach(function(card, i) {
+            if (card.getAttribute('data-pos') === '0') current = i;
+        });
+        if (btn.getAttribute('data-dir') === 'up' && current > 0) current--;
+        else if (btn.getAttribute('data-dir') === 'down' && current < total - 1) current++;
+        // Re-render positions
+        cards.forEach(function(card, i) {
+            var offset = i - current;
+            if (offset < 0 || offset > 2) card.setAttribute('data-pos', 'hidden');
+            else card.setAttribute('data-pos', String(offset));
+        });
+        if (counter) counter.textContent = (current + 1) + '/' + total;
+        if (upBtn) upBtn.disabled = current === 0;
+        if (downBtn) downBtn.disabled = current >= total - 1;
+    });
+
+    // --- Accept button: copy related lot values into override form ---
+    document.body.addEventListener('click', function(e) {
+        var acceptBtn = e.target.closest('.stack-card-accept');
+        if (!acceptBtn || !acceptBtn.closest('#lot-modal-body')) return;
+        var card = acceptBtn.closest('.stack-card');
+        if (!card) return;
+        var form = document.querySelector('#lot-modal-body .override-row');
+        if (!form) return;
+        var fields = {l: 'l', w: 'w', h: 'h', wgt: 'wgt'};
+        for (var key in fields) {
+            var val = card.getAttribute('data-' + key);
+            var input = form.querySelector('input[name="' + fields[key] + '"]');
+            if (input && val) input.value = val;
+        }
+        var cpackVal = card.getAttribute('data-cpack');
+        var cpackSelect = form.querySelector('select[name="cpack"]');
+        if (cpackSelect && cpackVal) {
+            cpackSelect.value = cpackVal;
+            cpackSelect.dispatchEvent(new Event('change'));
+        }
+    });
 
     // --- Pagination: jump-to-page ---
     document.body.addEventListener('click', function(e) {
@@ -280,23 +359,33 @@
         + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
         + '</tbody></table>';
 
+    var _sellerClicked = false;
+
     document.body.addEventListener('htmx:beforeRequest', function(e) {
         var target = e.detail.target;
-        var reqUrl = e.detail.pathInfo && e.detail.pathInfo.requestPath || '';
-        // SWR: skip skeleton for background refresh requests (cached content already visible)
-        if (target && target.id === 'panel-left2-content' && e.detail.elt.classList.contains('panel-item')) {
+        var elt = e.detail.elt;
+
+        // Ignore clicks on already-active seller or event
+        if (elt.classList.contains('panel-item') && elt.classList.contains('active')) {
+            e.preventDefault();
+            return;
+        }
+
+        // Show skeleton for seller click + track for auto-select
+        if (target && target.id === 'panel-left2-content' && elt.classList.contains('panel-item')) {
+            _sellerClicked = true;
             target.innerHTML = skeletonHTML;
             target.setAttribute('data-seller-id', '');
             var mainContent = document.getElementById('panel-main-content');
             if (mainContent) mainContent.innerHTML = mainEmptyHTML;
         }
         // Show lots skeleton when clicking an event item (panel-item inside events panel)
-        if (target && target.id === 'panel-main-content' && e.detail.elt.classList.contains('panel-item') && e.detail.elt.closest && e.detail.elt.closest('#panel-left2')) {
+        if (target && target.id === 'panel-main-content' && elt.classList.contains('panel-item') && elt.closest && elt.closest('#panel-left2')) {
             target.innerHTML = lotsSkeletonHTML;
         }
     });
 
-    // SWR: track current seller on events panel and guard stale refresh swaps
+    // SWR: track current seller on events panel, guard stale refreshes, auto-select first event
     document.body.addEventListener('htmx:afterSwap', function(e) {
         var target = e.detail.target;
         if (target && target.id === 'panel-left2-content') {
@@ -305,6 +394,12 @@
             var m = reqPath.match(/\/panels\/sellers\/(\d+)\/events\//);
             if (m && reqPath.indexOf('fresh=1') === -1) {
                 target.setAttribute('data-seller-id', m[1]);
+            }
+            // Auto-select first event after a seller click
+            if (_sellerClicked) {
+                _sellerClicked = false;
+                var firstEvent = target.querySelector('.panel-item');
+                if (firstEvent) firstEvent.click();
             }
         }
     });
@@ -333,8 +428,8 @@
     // Mark row dirty on input/change and reset 15s inactivity timer
     function markDirty(tr) {
         tr.dataset.dirty = '1';
-        var btn = tr.querySelector('.btn-icon');
-        if (btn) { btn.classList.add('save-dirty'); btn.classList.remove('save-clean'); }
+        var btn = tr.querySelector('.override-btn');
+        if (btn) btn.classList.remove('save-clean');
         // Reset 15s inactivity timer
         if (tr._inactivityTimer) clearTimeout(tr._inactivityTimer);
         tr._inactivityTimer = setTimeout(function() {
@@ -396,9 +491,10 @@
     });
 
     // Concurrent save queueing: prevent overlapping saves for the same lot
+    // Only applies to the row's own POST (form submit), not child GET requests (e.g. opening modal)
     document.body.addEventListener('htmx:beforeRequest', function(e) {
         var tr = getLotRow(e.detail.elt);
-        if (!tr) return;
+        if (!tr || e.detail.elt !== tr) return;
         if (tr.dataset.saving === '1') {
             // A save is already in flight — queue this one
             e.preventDefault();
@@ -415,9 +511,8 @@
         tr.dataset.saving = '';
         tr.dataset.dirty = '';
         if (tr._inactivityTimer) { clearTimeout(tr._inactivityTimer); tr._inactivityTimer = null; }
-        var btn = tr.querySelector('.btn-icon');
+        var btn = tr.querySelector('.override-btn');
         if (btn) {
-            btn.classList.remove('save-dirty');
             btn.classList.add('save-clean');
             setTimeout(function() { btn.classList.remove('save-clean'); }, 3000);
         }
