@@ -291,6 +291,10 @@ dialog#lot-modal::backdrop { background: rgba(0,0,0,0.5); }
 .lot-info { padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .lot-desc-title { font-size: 0.9375rem; font-weight: 600; color: #1e293b; line-height: 1.4; }
 .lot-info .lot-desc-notes { font-size: 0.8125rem; color: #64748b; line-height: 1.6; display: block; -webkit-line-clamp: unset; overflow: visible; }
+.lot-info .lot-desc-notes[contenteditable] { cursor: text; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; transition: outline-color 0.15s; outline: 1px solid transparent; min-height: 1.4em; }
+.lot-info .lot-desc-notes[contenteditable]:hover { outline-color: #cbd5e1; }
+.lot-info .lot-desc-notes[contenteditable]:focus { outline-color: #94a3b8; background: #f8fafc; }
+.lot-info .lot-desc-notes[contenteditable]:empty::before { content: attr(data-placeholder); color: #94a3b8; font-style: italic; pointer-events: none; }
 
 /* === Override Row (Modal + Table) === */
 .override-row { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; display: flex; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap; }

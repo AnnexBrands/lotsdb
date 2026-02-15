@@ -70,10 +70,15 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 # --- Cache (Redis) ---
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.environ.get("REDIS_URL", "redis://127.0.0.1:6379"),
         "KEY_PREFIX": "cat_",
-        "TIMEOUT": 300,
+        "TIMEOUT": None,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
+        },
     }
 }
 

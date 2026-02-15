@@ -29,7 +29,7 @@ class TestSafeCacheGet:
     def test_logs_warning_on_exception(self, mock_cache, caplog):
         mock_cache.get.side_effect = Exception("boom")
         safe_cache_get("mykey")
-        assert "Cache read failed for key=mykey" in caplog.text
+        assert "Cache read failed for key=mykey: boom" in caplog.text
 
 
 class TestSafeCacheSet:
@@ -50,4 +50,4 @@ class TestSafeCacheSet:
     def test_logs_warning_on_exception(self, mock_cache, caplog):
         mock_cache.set.side_effect = Exception("boom")
         safe_cache_set("mykey", "value")
-        assert "Cache write failed for key=mykey" in caplog.text
+        assert "Cache write failed for key=mykey: boom" in caplog.text

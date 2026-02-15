@@ -185,6 +185,40 @@
         if (cpackSel) cpackSel.dispatchEvent(new Event('change'));
     });
 
+    // --- Modal notes inline edit (contenteditable blur-save) ---
+    var _notesSaving = false;
+    document.body.addEventListener('focusout', function(e) {
+        var el = e.target;
+        if (!el.matches || !el.matches('[contenteditable][data-field]')) return;
+        if (!el.closest('#lot-modal-body')) return;
+        if (_notesSaving) return;
+        var field = el.dataset.field;
+        var lotId = el.dataset.lotId;
+        if (!field || !lotId) return;
+        var value = el.textContent.trim();
+        _notesSaving = true;
+        var csrfToken = document.querySelector('meta[name="csrf-token"]');
+        if (!csrfToken) csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        var token = csrfToken ? csrfToken.value || csrfToken.content : '';
+        var body = new URLSearchParams();
+        body.append(field, value);
+        fetch('/panels/lots/' + lotId + '/text-save/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': token,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: body,
+        }).then(function(resp) {
+            _notesSaving = false;
+            if (resp.ok && window.showToast) window.showToast('Saved', 'success');
+            else if (window.showToast) window.showToast('Could not save', 'error');
+        }).catch(function() {
+            _notesSaving = false;
+            if (window.showToast) window.showToast('Could not save', 'error');
+        });
+    });
+
     // --- Gallery thumbnail navigation (event-delegated main-image swap) ---
     document.body.addEventListener('click', function(e) {
         var thumb = e.target.closest('.lot-gallery-thumb');
@@ -360,6 +394,7 @@
         + '</tbody></table>';
 
     var _sellerClicked = false;
+    var _autoSelectInFlight = false;
 
     document.body.addEventListener('htmx:beforeRequest', function(e) {
         var target = e.detail.target;
@@ -385,7 +420,7 @@
         }
     });
 
-    // SWR: track current seller on events panel, guard stale refreshes, auto-select first event
+    // SWR: track current seller on events panel, guard stale refreshes
     document.body.addEventListener('htmx:afterSwap', function(e) {
         var target = e.detail.target;
         if (target && target.id === 'panel-left2-content') {
@@ -395,11 +430,38 @@
             if (m && reqPath.indexOf('fresh=1') === -1) {
                 target.setAttribute('data-seller-id', m[1]);
             }
-            // Auto-select first event after a seller click
-            if (_sellerClicked) {
-                _sellerClicked = false;
-                var firstEvent = target.querySelector('.panel-item');
-                if (firstEvent) firstEvent.click();
+        }
+    });
+
+    // Auto-select first event after seller click — use afterSettle so HTMX has initialized hx-* attrs.
+    // If the response came from cache (SWR div present), defer auto-select until the SWR
+    // network request settles.  This avoids an hx-sync conflict: both the SWR request and
+    // the auto-selected event click originate from within #panel-left2 (hx-sync="this:replace"),
+    // so firing them at the same time causes one to sendAbort the other.
+    document.body.addEventListener('htmx:afterSettle', function(e) {
+        var target = e.detail.target;
+        if (target && target.id === 'panel-left2-content' && _sellerClicked) {
+            // If a SWR div is present, let the SWR complete first — it will swap
+            // fresh content (without a SWR div) and trigger afterSettle again.
+            if (target.querySelector('[data-swr-refresh]')) return;
+            _sellerClicked = false;
+            var firstEvent = target.querySelector('.panel-item');
+            if (firstEvent) {
+                _autoSelectInFlight = true;
+                firstEvent.click();
+            }
+        }
+        // Clear auto-select flag once lots panel has settled, and highlight
+        // the selected event (we stripped the OOB swap that normally does this).
+        if (target && target.id === 'panel-main-content' && _autoSelectInFlight) {
+            _autoSelectInFlight = false;
+            var eventsPanel = document.getElementById('panel-left2-content');
+            if (eventsPanel) {
+                eventsPanel.querySelectorAll('.panel-item.active').forEach(function(item) {
+                    item.classList.remove('active');
+                });
+                var first = eventsPanel.querySelector('.panel-item');
+                if (first) first.classList.add('active');
             }
         }
     });
@@ -415,6 +477,19 @@
                 if (m && currentSeller && m[1] !== currentSeller) {
                     e.detail.shouldSwap = false;
                 }
+            }
+        }
+        // During auto-select, the lots response includes an OOB swap that
+        // overwrites #panel-left2-content with cached events, reverting the
+        // fresh SWR data.  Strip the OOB div so the events panel keeps
+        // the SWR content; we highlight the selected event in afterSettle.
+        if (target && target.id === 'panel-main-content' && _autoSelectInFlight) {
+            var tmp = document.createElement('div');
+            tmp.innerHTML = e.detail.serverResponse;
+            var oobEvents = tmp.querySelector('#panel-left2-content[hx-swap-oob]');
+            if (oobEvents) {
+                oobEvents.remove();
+                e.detail.serverResponse = tmp.innerHTML;
             }
         }
     });
@@ -480,13 +555,16 @@
         }
     });
 
-    // Clear timers on immediate save click
+    // Immediate save on click of the red disk button
     document.body.addEventListener('click', function(e) {
-        if (!e.target.closest('.btn-icon[type="submit"]')) return;
-        var tr = getLotRow(e.target);
+        var btn = e.target.closest('.btn-icon[type="submit"]');
+        if (!btn) return;
+        var tr = getLotRow(btn);
         if (tr) {
+            e.preventDefault();
             if (tr._autoSaveTimer) { clearTimeout(tr._autoSaveTimer); tr._autoSaveTimer = null; }
             if (tr._inactivityTimer) { clearTimeout(tr._inactivityTimer); tr._inactivityTimer = null; }
+            htmx.trigger(tr, 'submit');
         }
     });
 
@@ -528,6 +606,15 @@
     document.body.addEventListener('htmx:responseError', function(e) {
         var tr = getLotRow(e.detail.elt);
         if (tr) tr.dataset.saving = '';
+    });
+
+    // Clear saving flag on request abort (hx-sync:replace can abort in-flight saves)
+    document.body.addEventListener('htmx:sendAbort', function(e) {
+        var tr = getLotRow(e.detail.elt);
+        if (tr) {
+            tr.dataset.saving = '';
+            tr._pendingSave = false;
+        }
     });
 
     // --- Arrow-key navigation between dims fields ---

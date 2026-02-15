@@ -27,7 +27,7 @@
 
         <div class="lot-info">
             <div class="lot-desc-title">{{ lot_description|default:"No description" }}</div>
-            {% if lot_notes %}<div class="lot-desc-notes">{{ lot_notes }}</div>{% endif %}
+            <p class="lot-desc-notes" contenteditable="true" data-field="notes" data-lot-id="{{ lot.id }}" data-placeholder="Click to add notes">{{ lot_notes|default:"" }}</p>
 
             <form class="override-row" hx-post="/panels/lots/{{ lot.id }}/override/" hx-swap="none" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>
                 {% csrf_token %}

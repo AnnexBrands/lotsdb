@@ -8,10 +8,9 @@ version = "0.1.0"
 description = "Auction Catalog Manager - browse and override lot data"
 requires-python = ">=3.11"
 dependencies = [
-    "Django>=5.0,<6.0",
-    "ABConnect",
+    "Django>=5.0",
     "python-dotenv>=1.0",
-    "redis>=5.0",
+    "django-redis",
 ]
 
 [project.optional-dependencies]
