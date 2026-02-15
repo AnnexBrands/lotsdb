@@ -43,6 +43,33 @@ def format_number(value):
         return str(value)
 
 
+@register.filter
+def dim_error_class(value):
+    """Return error CSS class when a dimension/weight/cpack value is 0 or missing."""
+    if value is None or value == "":
+        return "lot-input-missing"
+    try:
+        if float(value) == 0:
+            return "lot-input-missing"
+    except (ValueError, TypeError):
+        pass
+    return ""
+
+
+@register.filter
+def show_ref(field):
+    """Show original ref only when changed and original > 0."""
+    if not field.get("changed"):
+        return False
+    orig = field.get("original")
+    if orig is None or orig == "":
+        return False
+    try:
+        return float(orig) > 0
+    except (ValueError, TypeError):
+        return bool(orig)
+
+
 CPACK_MAP = {
     "1": ("NF", "cpack-nf"),
     "2": ("LF", "cpack-lf"),
