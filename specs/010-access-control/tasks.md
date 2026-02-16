@@ -88,7 +88,7 @@
 **Purpose**: Final validation and cleanup
 
 - [X] T015 Run full test suite with `.venv/bin/python -m pytest tests/ -v` and fix any failures
-- [ ] T016 Run quickstart.md manual verification steps (login → verify User created → browse as staff → demote → verify no-access → re-promote)
+- [X] T016 Run quickstart.md manual verification steps (login → verify User created → browse as staff → demote → verify no-access → re-promote)
 - [X] T017 Verify `ruff check src/` passes with no new warnings
 
 ---

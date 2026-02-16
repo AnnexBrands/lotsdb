@@ -89,7 +89,7 @@
 **Purpose**: Validate all fixes work together and pass existing tests.
 
 - [X] T013 Run full test suite — `pytest tests/ -v` from `/usr/src/lotsdb` and fix any regressions
-- [ ] T014 Run quickstart.md manual validation — follow all steps in `specs/018-critical-bug-fixes/quickstart.md` to confirm each bug fix works end-to-end
+- [X] T014 Run quickstart.md manual validation — follow all steps in `specs/018-critical-bug-fixes/quickstart.md` to confirm each bug fix works end-to-end
 
 ---
 
