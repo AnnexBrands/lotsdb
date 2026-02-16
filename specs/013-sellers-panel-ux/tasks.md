@@ -62,7 +62,7 @@
 **Purpose**: Final validation across all stories.
 
 - [x] T006 Run full test suite (`python -m pytest tests/ -v`) and fix any regressions
-- [ ] T007 Run quickstart.md manual validation checklist — verify realtime filter, skeleton loading, events sort, existing behavior preserved
+- [X] T007 Run quickstart.md manual validation checklist — verify realtime filter, skeleton loading, events sort, existing behavior preserved
 
 ---
 

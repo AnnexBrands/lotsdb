@@ -79,7 +79,7 @@
 ## Phase 6: Polish & Verification
 
 - [X] T013 Run `cd src && python -m pytest ../tests/ -v` to confirm all existing and new tests pass
-- [ ] T014 Run manual verification per `specs/015-redis-caching/quickstart.md` — seller caching, catalog caching, filter bypass, cache unavailability, key prefix
+- [X] T014 Run manual verification per `specs/015-redis-caching/quickstart.md` — seller caching, catalog caching, filter bypass, cache unavailability, key prefix
 
 ---
 

@@ -137,25 +137,14 @@ gh pr list --head <branch-name> --state all --json number,title,state,url,review
 If `gh` is not available or not authenticated, report "PR status unavailable"
 and continue. Do not fail.
 
-**3f. Detect Fast-Forward vs Full Cycle mode:**
-
-- If `spec.md` does NOT exist AND the branch has commits beyond `main`:
-  → Likely **Fast-Forward mode**
-- If `spec.md` exists → **Full Cycle mode**
-- If no commits beyond `main` and no spec.md → **Just started** (mode undetermined)
-
 ### 4. Feature Report — Detect Phase and Next Step
 
 Use this decision tree to determine the current phase:
 
 ```
 if spec.md does not exist:
-    if branch has commits beyond main:
-        PHASE = "Fast-Forward: PR pending"
-        NEXT  = "Push and run: gh pr create"
-    else:
-        PHASE = "Specify"
-        NEXT  = "/speckit.specify <description>"
+    PHASE = "Specify"
+    NEXT  = "/speckit.specify <description>"
 
 elif plan.md does not exist:
     # Check if spec has [NEEDS CLARIFICATION] markers
@@ -194,11 +183,11 @@ elif task completion = 100%:
         NEXT  = "Address review feedback, push fixes"
     elif PR exists with reviewDecision = APPROVED:
         PHASE = "UAT"
-        NEXT  = "Run UAT protocol (FEATURE_CYCLE.md Section 12)"
+        NEXT  = "/speckit.uat"
     elif PR state = MERGED:
         # Check if more tasks remain for multi-phase
         PHASE = "Close Cycle"
-        NEXT  = "Delete branch, prune, tag (FEATURE_CYCLE.md Section 14)"
+        NEXT  = "Delete branch, prune, tag (FEATURE_CYCLE.md Section 13)"
     else:
         PHASE = "Awaiting Review"
         NEXT  = "Wait for Codex review on PR"
@@ -215,7 +204,6 @@ Map the detected phase to the FEATURE_CYCLE.md section number for reference.
 
 **Branch**: NNN-feature-name
 **Feature dir**: specs/NNN-feature-name/
-**Mode**: Full Cycle | Fast-Forward
 **Current phase**: [Phase Name]
 **Cycle reference**: FEATURE_CYCLE.md Section N
 
@@ -272,18 +260,17 @@ Map the detected phase to the FEATURE_CYCLE.md section number for reference.
 | Phase | Indicators | Next Skill | Cycle Section |
 |-------|-----------|------------|---------------|
 | Between Cycles | On main, no feature branch | `/speckit.specify` | 1 |
-| Specify | Feature branch, no spec.md, no commits | `/speckit.specify` | 3 |
-| FF: PR pending | Feature branch, no spec.md, has commits | `gh pr create` | 2 |
-| Clarify | spec.md with NEEDS CLARIFICATION | `/speckit.clarify` | 4 |
-| Plan | spec.md exists, no plan.md | `/speckit.plan` | 5 |
-| Tasks | plan.md exists, no tasks.md | `/speckit.tasks` | 6 |
-| Analyze | tasks.md at 0%, no checklists | `/speckit.analyze` | 7 |
-| Checklist | Post-analyze, pre-implement | `/speckit.checklist` | 8 |
-| Implement | tasks 0-99% complete | `/speckit.implement` | 9 |
-| PR Creation | tasks 100%, no PR | `gh pr create` | 10 |
-| Stabilization | PR open, changes requested | Fix + push | 11 |
-| UAT | PR approved | UAT protocol | 12 |
-| Close Cycle | PR merged | Prune + tag | 14 |
+| Specify | Feature branch, no spec.md | `/speckit.specify` | 2 |
+| Clarify | spec.md with NEEDS CLARIFICATION | `/speckit.clarify` | 3 |
+| Plan | spec.md exists, no plan.md | `/speckit.plan` | 4 |
+| Tasks | plan.md exists, no tasks.md | `/speckit.tasks` | 5 |
+| Analyze | tasks.md at 0%, no checklists | `/speckit.analyze` | 6 |
+| Checklist | Post-analyze, pre-implement | `/speckit.checklist` | 7 |
+| Implement | tasks 0-99% complete | `/speckit.implement` | 8 |
+| PR Creation | tasks 100%, no PR | `gh pr create` | 9 |
+| Stabilization | PR open, changes requested | Fix + push | 10 |
+| UAT | PR approved | `/speckit.uat` | 11 |
+| Close Cycle | PR merged | Prune + tag | 13 |
 
 ## Context
 

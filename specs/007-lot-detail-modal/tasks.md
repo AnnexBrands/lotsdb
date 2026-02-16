@@ -96,8 +96,8 @@
 
 **Purpose**: Final cleanup and validation
 
-- [ ] T017 [P] Run `ruff check .` from `src/` and fix any linting issues introduced by the new view code in `src/catalog/views/panels.py`
-- [ ] T018 Validate quickstart.md manual test steps against the implementation — walk through each of the 5 test scenarios in `specs/007-lot-detail-modal/quickstart.md` and verify accuracy of expected behavior descriptions and file paths
+- [X] T017 [P] Run `ruff check .` from `src/` and fix any linting issues introduced by the new view code in `src/catalog/views/panels.py`
+- [X] T018 Validate quickstart.md manual test steps against the implementation — walk through each of the 5 test scenarios in `specs/007-lot-detail-modal/quickstart.md` and verify accuracy of expected behavior descriptions and file paths
 
 ---
 

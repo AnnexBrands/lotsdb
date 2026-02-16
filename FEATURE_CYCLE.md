@@ -1,11 +1,11 @@
 # Feature Cycle
 
-**Version**: 2.0.0 | **Applies to**: Everard / lotsdb | **Last updated**: 2026-02-16
+**Version**: 3.0.0 | **Applies to**: Everard / lotsdb | **Last updated**: 2026-02-16
 
 This document defines the full lifecycle of a feature from inception through
-production. It supports two modes — **Full Cycle** for multi-phase features
-and **Fast-Forward** for small changes — and describes the between-cycle
-hygiene that keeps `main` clean.
+production. Every change — large or small — follows the same cycle. For small
+changes the steps are brief; for complex features they are thorough. The cycle
+also describes the between-cycle hygiene that keeps `main` clean.
 
 Run `/speckit.overview` at any time to see where you are in the cycle.
 
@@ -16,69 +16,24 @@ Run `/speckit.overview` at any time to see where you are in the cycle.
 ```mermaid
 graph TD
     A["Between Cycles<br/><i>/speckit.overview</i>"]
-    A --> MODE{"Choose Mode"}
-
-    subgraph FF ["Fast-Forward Mode"]
-        direction TB
-        FF1["Branch & Commit"]
-        FF2["Push & PR<br/><i>gh pr create</i>"]
-        FF3["Review"]
-        FF4["Merge & Clean"]
-        FF1 --> FF2
-        FF2 --> FF3
-        FF3 -->|Changes requested| FF1
-        FF3 -->|Approved| FF4
-    end
-
-    subgraph FULL ["Full Cycle Mode"]
-        direction TB
-        B["Specify<br/><i>/speckit.specify</i>"]
-        C["Clarify<br/><i>/speckit.clarify</i>"]
-        D["Plan<br/><i>/speckit.plan</i>"]
-        E["Tasks<br/><i>/speckit.tasks</i>"]
-        F["Analyze<br/><i>/speckit.analyze</i>"]
-        G["Checklist<br/><i>/speckit.checklist</i>"]
-        H["Implement Phase<br/><i>/speckit.implement</i>"]
-        I["PR + Codex Review<br/><i>gh pr create</i>"]
-        J{"Stabilize"}
-        K["UAT<br/><i>Enforce Harmony</i>"]
-
-        B --> C --> D --> E --> F
-        F -->|Issues| E
-        F -->|Clean| G --> H
-        H --> I --> J
-        J -->|Fix needed| H
-        J -->|Stable| K
-        K -->|Fails| J
-        K -->|"More phases"| H
-        K -->|"All phases done"| DONE
-    end
-
-    MODE -->|Small change| FF1
-    MODE -->|Multi-phase feature| B
-
-    FF4 --> TAG
-    DONE["Phases Complete"] --> TAG
+    A --> B["Specify<br/><i>/speckit.specify</i>"]
+    B --> C["Clarify<br/><i>/speckit.clarify</i>"]
+    C --> D["Plan<br/><i>/speckit.plan</i>"]
+    D --> E["Tasks<br/><i>/speckit.tasks</i>"]
+    E --> F["Analyze<br/><i>/speckit.analyze</i>"]
+    F -->|Issues| E
+    F -->|Clean| G["Checklist<br/><i>/speckit.checklist</i>"]
+    G --> H["Implement Phase<br/><i>/speckit.implement</i>"]
+    H --> I["PR + Codex Review<br/><i>gh pr create</i>"]
+    I --> J{"Stabilize"}
+    J -->|Fix needed| H
+    J -->|Stable| K["UAT<br/><i>/speckit.uat</i>"]
+    K -->|Fails| J
+    K -->|"More phases"| H
+    K -->|"All phases done"| TAG
     TAG["Tag & Deploy<br/><i>git tag, /deploy</i>"]
     TAG --> A
 ```
-
----
-
-## 0. Mode Selection — Choose Your Path
-
-Before starting work, decide which mode fits the change.
-
-| | Full Cycle | Fast-Forward |
-|---|---|---|
-| **Use when** | New features, multi-file behavioral changes, anything needing spec artifacts | Bug fixes <50 LOC, config tweaks, doc-only, dependency bumps, single-file refactors |
-| **Artifacts** | spec.md, plan.md, tasks.md, contracts, checklists | PR description + commit message |
-| **PRs** | One or more (per implementation phase) | One |
-| **Tag** | One, after all phases merge | One, after merge |
-| **Traceability** | Full spec → code → test → doc chain | PR description is source of truth |
-
-**Heuristic:** If a commit message fully describes the change, use Fast-Forward.
-If you would write a `spec.md` for it, use Full Cycle.
 
 ---
 
@@ -102,52 +57,7 @@ Run `/speckit.overview` to check readiness.
 
 ---
 
-## 2. Fast-Forward Mode
-
-For small, self-contained changes that don't warrant the full speckit pipeline.
-
-### Steps
-
-1. **Branch**: `git checkout -b NNN-short-name`
-2. **Commit**: Make changes, commit with a descriptive message explaining what and why
-3. **Push**: `git push -u origin NNN-short-name`
-4. **PR**: `gh pr create --title "..." --body "..."`
-   - The PR body serves as the spec — include context, what changed, and why
-5. **Review**: Codex or human reviews the PR
-   - If changes requested: fix, commit, push, re-review
-6. **Merge**: Squash-merge via GitHub
-7. **Clean**: Delete branch, prune, tag if warranted
-
-### Fast-Forward Review Loop
-
-```mermaid
-graph LR
-    COMMIT["Commit & Push"] --> PR["Create PR"]
-    PR --> REVIEW["Review"]
-    REVIEW -->|Approved| MERGE["Squash-Merge"]
-    REVIEW -->|Changes| COMMIT
-    MERGE --> CLEAN["Delete Branch + Tag"]
-```
-
-### Traceability
-
-Fast-Forward mode still uses `NNN-short-name` branches for traceability.
-The commit message and PR description are the source of truth — they must
-explain the **what** and **why** clearly enough for future readers.
-
-No spec artifacts are required, but the PR must be self-documenting.
-
----
-
-## Full Cycle Mode
-
-Sections 3-12 apply when you selected Full Cycle mode for a multi-phase
-feature. The feature progresses through specification, design, implementation,
-and stabilization — potentially across multiple PRs before a single tag.
-
----
-
-### 3. Specify — Define the Feature
+### 2. Specify — Define the Feature
 
 | | |
 |---|---|
@@ -164,7 +74,7 @@ technology-agnostic, and testable.
 
 ---
 
-### 4. Clarify — Reduce Ambiguity
+### 3. Clarify — Reduce Ambiguity
 
 | | |
 |---|---|
@@ -179,7 +89,7 @@ immediately. Skip if the spec emerged clean from `/speckit.specify`.
 
 ---
 
-### 5. Plan — Design the Solution
+### 4. Plan — Design the Solution
 
 | | |
 |---|---|
@@ -195,7 +105,7 @@ new technologies.
 
 ---
 
-### 6. Tasks — Break Down the Work
+### 5. Tasks — Break Down the Work
 
 | | |
 |---|---|
@@ -209,7 +119,7 @@ file path. Phases: Setup, Foundational, User Stories (priority order), Polish.
 
 ---
 
-### 7. Analyze — Cross-Artifact Consistency Check
+### 6. Analyze — Cross-Artifact Consistency Check
 
 | | |
 |---|---|
@@ -227,7 +137,7 @@ resolve before proceeding.
 
 ---
 
-### 8. Checklist — Domain-Specific Quality Gates
+### 7. Checklist — Domain-Specific Quality Gates
 
 | | |
 |---|---|
@@ -242,7 +152,7 @@ before implementation begins.
 
 ---
 
-### 9. Implement — Execute the Plan
+### 8. Implement — Execute the Plan
 
 | | |
 |---|---|
@@ -264,9 +174,9 @@ Phase 2 = US3 + US4).
 Each phase:
 
 1. Implements its subset of tasks
-2. Creates its own PR (see Section 10)
-3. Goes through Codex review and stabilization (Section 11)
-4. Passes UAT (Section 12)
+2. Creates its own PR (see Section 9)
+3. Goes through Codex review and stabilization (Section 10)
+4. Passes UAT (Section 11)
 5. Gets squash-merged into `main`
 6. Next phase begins back at this step (Implement)
 
@@ -275,7 +185,7 @@ The feature is not "done" until all phases have merged.
 
 ---
 
-### 10. PR + Codex Review — External Stabilization
+### 9. PR + Codex Review — External Stabilization
 
 | | |
 |---|---|
@@ -305,7 +215,7 @@ After `/speckit.implement` completes a phase:
 
 ---
 
-### 11. Stabilization & Hardening Loop
+### 10. Stabilization & Hardening Loop
 
 ```mermaid
 graph LR
@@ -333,7 +243,7 @@ all notes acknowledged).
 
 ---
 
-### 12. UAT — Enforce Harmony
+### 11. UAT — Enforce Harmony
 
 User Acceptance Testing validates that all artifacts are in harmony before
 merging. This is the constitution's prime directive (Principle I) made
@@ -362,8 +272,8 @@ graph TD
 
 #### After UAT Passes
 
-- **More phases remaining?** Loop back to Section 9 (Implement) for the next phase
-- **All phases done?** Proceed to Section 13 (Deploy)
+- **More phases remaining?** Loop back to Section 8 (Implement) for the next phase
+- **All phases done?** Proceed to Section 12 (Deploy)
 
 #### UAT Template
 
@@ -401,15 +311,15 @@ For each feature (or phase), complete this checklist before merging:
 
 **Step 6 — Verdict**
 - [ ] **SHIP**: All steps pass — proceed to deploy (or next phase)
-- [ ] **FIX**: Issues found — return to Stabilization Loop (Section 11)
+- [ ] **FIX**: Issues found — return to Stabilization Loop (Section 10)
 
-> **Suggested tooling:** Consider creating a `/speckit.uat` skill that
-> automates this template: reads the spec, derives expected test coverage,
-> compares against actual test files, runs the test suite, and validates docs.
+**Tooling:** Run `/speckit.uat` to execute this protocol interactively —
+it automates findings, prompts for per-step verdicts, and persists results
+in `uat-report.md`.
 
 ---
 
-### 13. Deploy
+### 12. Deploy
 
 | | |
 |---|---|
@@ -422,7 +332,7 @@ restarting the service.
 
 ---
 
-### 14. Close Cycle — Merge, Prune, Tag
+### 13. Close Cycle — Merge, Prune, Tag
 
 After successful deploy, close the cycle. For multi-phase features, this
 happens once after **all** phases have merged — not per-phase.
@@ -438,33 +348,32 @@ happens once after **all** phases have merged — not per-phase.
 5. **Verify** clean state: `git status` shows clean working tree on `main`
 6. **Update agent context**: run `.specify/scripts/bash/update-agent-context.sh claude`
 
-> **Suggested tooling:** Same `/speckit.housekeep` skill suggested in
+> **Suggested tooling:** The `/speckit.housekeep` skill suggested in
 > Section 1 would handle this.
 
 ---
 
 ## Quick Reference: Skills & Tools by Phase
 
-| Phase | Skill / Tool | Mode | Exists? |
-|-------|-------------|------|---------|
-| Overview (any time) | `/speckit.overview` | Both | Yes |
-| Between Cycles | — | Both | No. See: `/speckit.housekeep` |
-| Fast-Forward | `git`, `gh pr create` | FF | Yes (CLI) |
-| Specify | `/speckit.specify` | Full | Yes |
-| Clarify | `/speckit.clarify` | Full | Yes |
-| Plan | `/speckit.plan` | Full | Yes |
-| Tasks | `/speckit.tasks` | Full | Yes |
-| Analyze | `/speckit.analyze` | Full | Yes |
-| Checklist | `/speckit.checklist` | Full | Yes |
-| Implement | `/speckit.implement` | Full | Yes |
-| PR Creation | `gh pr create` | Both | Yes (CLI) |
-| Codex Review | — | Full | No. See: `/speckit.review` |
-| Stabilization | — | Full | No. See: `/speckit.stabilize` |
-| UAT | — | Full | No. See: `/speckit.uat` |
-| Deploy | `/deploy` | Both | Yes |
-| Close Cycle | — | Both | No. See: `/speckit.housekeep` |
-| Tasks to Issues | `/speckit.taskstoissues` | Full | Yes |
-| Constitution | `/speckit.constitution` | Both | Yes |
+| Phase | Skill / Tool | Exists? |
+|-------|-------------|---------|
+| Overview (any time) | `/speckit.overview` | Yes |
+| Between Cycles | — | No. See: `/speckit.housekeep` |
+| Specify | `/speckit.specify` | Yes |
+| Clarify | `/speckit.clarify` | Yes |
+| Plan | `/speckit.plan` | Yes |
+| Tasks | `/speckit.tasks` | Yes |
+| Analyze | `/speckit.analyze` | Yes |
+| Checklist | `/speckit.checklist` | Yes |
+| Implement | `/speckit.implement` | Yes |
+| PR Creation | `gh pr create` | Yes (CLI) |
+| Codex Review | — | No. See: `/speckit.review` |
+| Stabilization | — | No. See: `/speckit.stabilize` |
+| UAT | `/speckit.uat` | Yes |
+| Deploy | `/deploy` | Yes |
+| Close Cycle | — | No. See: `/speckit.housekeep` |
+| Tasks to Issues | `/speckit.taskstoissues` | Yes |
+| Constitution | `/speckit.constitution` | Yes |
 
 ---
 

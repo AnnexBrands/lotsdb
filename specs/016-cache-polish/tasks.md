@@ -61,7 +61,7 @@
 ## Phase 4: Polish & Verification
 
 - [X] T013 Run full test suite: `cd src && python -m pytest ../tests/ -v` — confirm all existing and new tests pass
-- [ ] T014 Manual verification per `specs/016-cache-polish/quickstart.md` — event dates, pagination, env config, SWR, skeleton rows
+- [X] T014 Manual verification per `specs/016-cache-polish/quickstart.md` — event dates, pagination, env config, SWR, skeleton rows
 
 ---
 
