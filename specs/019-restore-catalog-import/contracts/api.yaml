@@ -1,0 +1,176 @@
+openapi: "3.0.3"
+info:
+  title: Catalog Import Upload API
+  version: "2.0"
+  description: >
+    Upload endpoint for catalog file import with merge-on-existing support.
+    Restores the 002-catalog-dropzone endpoint and adds merge behavior.
+
+paths:
+  /imports/upload/:
+    post:
+      operationId: upload_catalog
+      summary: Upload and import a catalog file
+      description: >
+        Accepts a catalog file (.xlsx, .csv, .json), parses it, and either
+        bulk-inserts (new catalog) or merges (existing catalog). Returns
+        JSON with redirect URL and optional merge summary.
+      security:
+        - session: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: >
+                    Catalog spreadsheet file. Accepted extensions: .xlsx, .csv, .json.
+                    Must contain columns matching the catalog import structure
+                    (Catalog ID, Lot ID, Lot Num, etc.).
+      responses:
+        "200":
+          description: Import or merge completed successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/NewCatalogResponse"
+                  - $ref: "#/components/schemas/MergeResponse"
+              examples:
+                new_catalog:
+                  summary: New catalog created via bulk insert
+                  value:
+                    success: true
+                    redirect: "/events/42/"
+                merge_success:
+                  summary: Merge into existing catalog
+                  value:
+                    success: true
+                    redirect: "/events/42/"
+                    merge:
+                      added: 5
+                      updated: 3
+                      unchanged: 12
+                      failed: 0
+                merge_with_failures:
+                  summary: Merge completed with some lot failures
+                  value:
+                    success: true
+                    redirect: "/events/42/"
+                    merge:
+                      added: 5
+                      updated: 2
+                      unchanged: 12
+                      failed: 1
+                    warnings:
+                      - "Failed to update lot ABC-001: server error"
+        "400":
+          description: File validation or parse error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                no_file:
+                  value:
+                    success: false
+                    error: "No file uploaded"
+                bad_extension:
+                  value:
+                    success: false
+                    error: "Unsupported file type: .txt. Accepted: .xlsx, .csv, .json"
+                parse_error:
+                  value:
+                    success: false
+                    error: "Failed to parse file: missing required column 'Catalog ID'"
+                empty_file:
+                  value:
+                    success: false
+                    error: "File contains no catalog data"
+        "500":
+          description: Server error during bulk insert or merge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                bulk_insert_failed:
+                  value:
+                    success: false
+                    error: "Import failed: API error during bulk insert"
+                merge_fetch_failed:
+                  value:
+                    success: false
+                    error: "Merge failed: unable to fetch existing lots"
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sessionid
+
+  schemas:
+    NewCatalogResponse:
+      type: object
+      required: [success, redirect]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        redirect:
+          type: string
+          description: URL to the created event page
+          example: "/events/42/"
+
+    MergeResponse:
+      type: object
+      required: [success, redirect, merge]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        redirect:
+          type: string
+          description: URL to the existing event page
+          example: "/events/42/"
+        merge:
+          $ref: "#/components/schemas/MergeSummary"
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Warning messages for partially failed operations
+
+    MergeSummary:
+      type: object
+      required: [added, updated, unchanged, failed]
+      properties:
+        added:
+          type: integer
+          description: Number of new lots inserted
+        updated:
+          type: integer
+          description: Number of lots deleted and re-created with new data
+        unchanged:
+          type: integer
+          description: Number of lots left as-is (identical data)
+        failed:
+          type: integer
+          description: Number of lots where update failed
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: string
+          description: Human-readable error message

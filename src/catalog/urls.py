@@ -1,6 +1,7 @@
 from django.urls import path
 
 from catalog.views.auth import login_view, logout_view, no_access
+from catalog.views.imports import upload_catalog
 from catalog.views.sellers import seller_list
 from catalog.views.panels import sellers_panel, seller_events_panel, event_lots_panel, lot_override_panel, lot_detail_panel, lot_text_save
 
@@ -15,4 +16,5 @@ urlpatterns = [
     path("panels/lots/<int:lot_id>/detail/", lot_detail_panel, name="lot_detail_panel"),
     path("panels/lots/<int:lot_id>/override/", lot_override_panel, name="lot_override_panel"),
     path("panels/lots/<int:lot_id>/text-save/", lot_text_save, name="lot_text_save"),
+    path("imports/upload/", upload_catalog, name="upload_catalog"),
 ]

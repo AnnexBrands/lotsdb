@@ -232,6 +232,13 @@ tbody tr:hover { background: #f8fafc; }
 .panel-error button:hover { background: #f1f5f9; }
 
 
+/* === Dropzone === */
+.dropzone { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.75rem; border: 1.5px dashed #64748b; border-radius: 4px; color: #94a3b8; font-size: 0.8rem; cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease; white-space: nowrap; }
+.dropzone:hover { border-color: #93c5fd; color: #fff; }
+.dropzone.dragover { border-color: #3b82f6; background: rgba(59,130,246,0.15); color: #fff; }
+.dropzone.uploading { opacity: 0.6; pointer-events: none; }
+.dropzone input[type="file"] { display: none; }
+
 /* === Toast === */
 .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
 .toast { padding: 0.75rem 1.25rem; border-radius: 6px; font-size: 0.85rem; color: #fff; pointer-events: auto; animation: toast-in 0.3s ease-out; max-width: 400px; word-break: break-word; }

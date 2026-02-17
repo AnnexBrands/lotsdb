@@ -64,12 +64,14 @@ def import_file(request):
 def upload_catalog(request):
     uploaded = request.FILES.get("file")
     if not uploaded:
-        return JsonResponse({"success": False, "error": "No file provided."})
+        return JsonResponse({"success": False, "error": "No file uploaded"}, status=400)
 
     suffix = Path(uploaded.name).suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
+        exts = ", ".join(sorted(SUPPORTED_EXTENSIONS))
         return JsonResponse(
-            {"success": False, "error": f"Unsupported file type: {suffix}. Accepted: .xlsx, .csv, .json"}
+            {"success": False, "error": f"Unsupported file type: {suffix}. Accepted: {exts}"},
+            status=400,
         )
 
     try:
@@ -83,21 +85,42 @@ def upload_catalog(request):
         finally:
             tmp_path.unlink(missing_ok=True)
     except Exception as e:
-        return JsonResponse({"success": False, "error": f"Failed to read file: {e}"})
+        return JsonResponse({"success": False, "error": f"Failed to parse file: {e}"}, status=400)
 
     if not bulk_request.catalogs:
-        return JsonResponse({"success": False, "error": "File contains no catalog data."})
+        return JsonResponse({"success": False, "error": "File contains no catalog data"}, status=400)
 
+    customer_catalog_id = bulk_request.catalogs[0].customer_catalog_id
+
+    # Check if catalog already exists — merge path (US2)
+    existing_catalog_id = services.find_catalog_by_customer_id(request, customer_catalog_id)
+    if existing_catalog_id:
+        try:
+            result = services.merge_catalog(request, bulk_request, existing_catalog_id)
+        except Exception as e:
+            return JsonResponse(
+                {"success": False, "error": f"Merge failed: {e}"},
+                status=500,
+            )
+        response = {
+            "success": True,
+            "redirect": "/",
+            "merge": {
+                "added": result["added"],
+                "updated": result["updated"],
+                "unchanged": result["unchanged"],
+                "failed": result["failed"],
+            },
+        }
+        if result.get("errors"):
+            response["warnings"] = result["errors"]
+        return JsonResponse(response)
+
+    # New catalog path — bulk insert
     try:
         services.bulk_insert(request, bulk_request)
     except Exception as e:
-        return JsonResponse({"success": False, "error": f"API error: {e}"})
+        return JsonResponse({"success": False, "error": f"Import failed: {e}"}, status=500)
 
-    customer_catalog_id = bulk_request.catalogs[0].customer_catalog_id
     event_id = services.find_catalog_by_customer_id(request, customer_catalog_id)
-    if event_id:
-        redirect_url = reverse("event_detail", args=[event_id])
-    else:
-        redirect_url = reverse("import_list")
-
-    return JsonResponse({"success": True, "redirect": redirect_url})
+    return JsonResponse({"success": True, "redirect": "/"})
