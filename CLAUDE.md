@@ -39,9 +39,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.14, Django 5: Follow standard conventions
 
 ## Recent Changes
+- 019-restore-catalog-import: Added Python 3.14, Django 5.2 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
 - 018-critical-bug-fixes: Added Python 3.14, Django 5.2 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), redis 7.1.1
 - 017-lots-modal-overhaul: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
-- 016-cache-polish: Added Python 3.14, Django 5 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), redis>=5.0
 
 
 <!-- MANUAL ADDITIONS START -->
