@@ -31,7 +31,7 @@
         <div class="htmx-indicator"><div class="spinner"></div></div>
         <div id="panel-main-content" class="panel-content">
             {% if hydrate_lots is not None %}
-                {% include "catalog/partials/lots_panel.html" with event=hydrate_event lots=hydrate_lots lot_rows=hydrate_lot_rows paginated=hydrate_lots_paginated event_id=selected_event_id seller_id=selected_seller_id pagination_url=hydrate_lots_pagination_url selected_event_id=selected_event_id oob_events=None %}
+                {% include "catalog/partials/lots_panel.html" with event=hydrate_event lots=hydrate_lots lot_rows=hydrate_lot_rows paginated=hydrate_lots_paginated event_id=selected_event_id seller_id=selected_seller_id pagination_url=hydrate_lots_pagination_url selected_event_id=selected_event_id oob_events=None selected_item_id=selected_item_id %}
             {% else %}
             <div class="panel-empty">
                 <div class="panel-empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14h6"/><path d="M9 18h6"/></svg></div>
@@ -377,16 +377,12 @@
         + '<td><div class="skeleton-thumb"></div></td>'
         + '<td><div class="skeleton-bar" style="width:60%;height:0.8125rem;margin-bottom:0.375rem"></div><div class="skeleton-bar" style="width:40%;height:0.625rem"></div></td>'
         + '<td><div class="skeleton-dims"><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div><div class="skeleton-bar skeleton-dims-bar"></div></div></td>'
-        + '<td><div class="skeleton-bar" style="width:2.5rem;height:0.75rem"></div></td>'
-        + '<td><div class="skeleton-bar" style="width:1rem;height:1rem;border-radius:2px"></div></td>'
-        + '<td><div class="skeleton-bar" style="width:1rem;height:1rem;border-radius:2px"></div></td>'
+        + '<td><div style="display:flex;gap:0.5rem;justify-content:center"><div class="skeleton-bar" style="width:2.5rem;height:0.75rem"></div><div class="skeleton-bar" style="width:1rem;height:1rem;border-radius:2px"></div><div class="skeleton-bar" style="width:1rem;height:1rem;border-radius:2px"></div></div></td>'
         + '<td></td></tr>';
     var lotsSkeletonHTML = '<table class="lots-table"><thead><tr>'
         + '<th></th><th>Lot Description</th>'
         + '<th style="text-align:center">Dimensions</th>'
-        + '<th style="text-align:center">CPack</th>'
-        + '<th style="text-align:center">Crate</th>'
-        + '<th style="text-align:center">DNT</th>'
+        + '<th style="text-align:center">Handling</th>'
         + '<th></th></tr></thead><tbody>'
         + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow
         + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow + lotsSkeletonRow

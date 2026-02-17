@@ -1,0 +1,74 @@
+{% if success %}
+<tr id="recovery-{{ entry.customer_item_id }}" class="recovery-row success">
+    <td>{{ entry.customer_item_id }}</td>
+    <td>{{ entry.lot_number }}</td>
+    <td><span class="badge badge-active">{{ entry.operation }}</span></td>
+    <td>Retry successful</td>
+    <td><span class="recovery-status found">Created on server</span></td>
+    <td>
+        {% if all_recovered %}
+            <a href="/" class="btn btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">All recovered — go to catalog</a>
+        {% else %}
+            <span style="color: #16a34a; font-size: 0.8rem;">Done</span>
+        {% endif %}
+    </td>
+</tr>
+{% elif warning %}
+<tr id="recovery-{{ entry.customer_item_id }}" class="recovery-row warning">
+    <td>{{ entry.customer_item_id }}</td>
+    <td>{{ entry.lot_number }}</td>
+    <td><span class="badge badge-flag">{{ entry.operation }}</span></td>
+    <td>Item already exists on server</td>
+    <td><span class="recovery-status found">Exists</span></td>
+    <td style="display: flex; gap: 0.25rem;">
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_skip' entry.customer_item_id %}"
+                hx-target="#recovery-{{ entry.customer_item_id }}"
+                hx-swap="outerHTML">Skip</button>
+        <button class="btn btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_retry' entry.customer_item_id %}?force=true"
+                hx-target="#recovery-{{ entry.customer_item_id }}"
+                hx-swap="outerHTML">Force Update</button>
+    </td>
+</tr>
+{% elif error %}
+<tr id="recovery-{{ entry.customer_item_id }}" class="recovery-row error">
+    <td>{{ entry.customer_item_id }}</td>
+    <td>{{ entry.lot_number }}</td>
+    <td><span class="badge badge-inactive">{{ entry.operation }}</span></td>
+    <td title="{{ error }}">{{ error|truncatewords:12 }}</td>
+    <td><span class="recovery-status missing">Failed</span></td>
+    <td style="display: flex; gap: 0.25rem;">
+        <button class="btn btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_retry' entry.customer_item_id %}"
+                hx-target="#recovery-{{ entry.customer_item_id }}"
+                hx-swap="outerHTML">Retry</button>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_skip' entry.customer_item_id %}"
+                hx-target="#recovery-{{ entry.customer_item_id }}"
+                hx-swap="outerHTML">Skip</button>
+    </td>
+</tr>
+{% else %}
+<tr id="recovery-{{ entry.customer_item_id }}" class="recovery-row">
+    <td>{{ entry.customer_item_id }}</td>
+    <td>{{ entry.lot_number }}</td>
+    <td><span class="badge badge-flag">{{ entry.operation }}</span></td>
+    <td title="{{ entry.error_message }}">{{ entry.error_message|truncatewords:12 }}</td>
+    <td id="recovery-status-{{ entry.customer_item_id }}"></td>
+    <td style="display: flex; gap: 0.25rem;">
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_check' entry.customer_item_id %}"
+                hx-target="#recovery-status-{{ entry.customer_item_id }}"
+                hx-swap="innerHTML">Check Server</button>
+        <button class="btn btn-primary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_retry' entry.customer_item_id %}"
+                hx-target="#recovery-{{ entry.customer_item_id }}"
+                hx-swap="outerHTML">Retry</button>
+        <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;"
+                hx-post="{% url 'recovery_skip' entry.customer_item_id %}"
+                hx-target="#recovery-{{ entry.customer_item_id }}"
+                hx-swap="outerHTML">Skip</button>
+    </td>
+</tr>
+{% endif %}

@@ -844,7 +844,7 @@ class TestLotsTableLayoutContract:
 
         content = response.content.decode()
         assert '<table class="lots-table">' in content
-        for header in ["Lot Description", "Dimensions", "CPack", "Crate", "DNT"]:
+        for header in ["Lot Description", "Dimensions", "Handling"]:
             assert f">{header}</th>" in content
         # Img and Save columns have empty headers
         assert content.count("<th></th>") >= 2
@@ -1294,8 +1294,8 @@ class TestCatalogCacheContract:
     @patch("catalog.services.safe_cache_set")
     @patch("catalog.services.safe_cache_get")
     @patch("catalog.services.get_catalog_api")
-    def test_cache_miss_fetches_filters_future_and_caches(self, mock_api, mock_get, mock_set, factory):
-        """TC-005: Cache miss fetches, filters future only, projects, caches."""
+    def test_cache_miss_fetches_caches_all_and_filters_future_at_return(self, mock_api, mock_get, mock_set, factory):
+        """TC-005: Cache miss fetches all events, caches all, returns only future when future_only=True."""
         mock_get.return_value = None
         api = mock_api.return_value
         api.catalogs.list.return_value = _mock_paginated([
@@ -1307,9 +1307,12 @@ class TestCatalogCacheContract:
 
         api.catalogs.list.assert_called_once_with(page_number=1, page_size=200, SellerIds=42)
         mock_set.assert_called_once()
+        # Cache stores ALL events (both future and past)
         cached_data = mock_set.call_args[0][1]
-        assert len(cached_data) == 1
-        assert cached_data[0]["title"] == "Future"
+        assert len(cached_data) == 2
+        assert {d["title"] for d in cached_data} == {"Future", "Past"}
+        # But return value is filtered to future only (default future_only=True)
+        assert len(result.items) == 1
         assert result.items[0].title == "Future"
 
 

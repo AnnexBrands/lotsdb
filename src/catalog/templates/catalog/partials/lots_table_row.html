@@ -1,5 +1,5 @@
 {% load catalog_tags %}
-<tr id="lot-row-{{ row.lot.id }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %} hx-post="/panels/lots/{{ row.lot.id }}/override/" hx-trigger="submit" hx-target="closest tr" hx-swap="outerHTML" hx-indicator="closest tr">
+<tr id="lot-row-{{ row.lot.id }}" class="{% if row.lot.customer_item_id == selected_item_id %}lot-active{% endif %}"{% if oob %} hx-swap-oob="outerHTML"{% endif %} hx-post="/panels/lots/{{ row.lot.id }}/override/" hx-trigger="submit" hx-target="closest tr" hx-swap="outerHTML" hx-indicator="closest tr" hx-include="this">
     <td class="lot-thumb-cell">
         <button type="button" class="lot-thumb-btn" hx-get="/panels/lots/{{ row.lot.id }}/detail/" hx-target="#lot-modal-body" hx-swap="innerHTML" aria-label="View lot {{ row.lot_number|default:row.lot.id }} details">
         {% if row.lot.image_links %}
@@ -31,8 +31,12 @@
             <span class="lot-dims-sep">lbs</span>
         </div>
     </td>
-    <td><select name="cpack" class="lot-input lot-input-sm cpack-badge cpack-field {{ row.fields.cpack.value|cpack_class }} {{ row.fields.cpack.value|dim_error_class }}"><option value="">—</option><option value="1"{% if row.fields.cpack.value == "1" %} selected{% endif %}>NF</option><option value="2"{% if row.fields.cpack.value == "2" %} selected{% endif %}>LF</option><option value="3"{% if row.fields.cpack.value == "3" %} selected{% endif %}>F</option><option value="4"{% if row.fields.cpack.value == "4" %} selected{% endif %}>VF</option><option value="PBO"{% if row.fields.cpack.value == "PBO" %} selected{% endif %}>PBO</option></select></td>
-    <td><input type="checkbox" name="force_crate" {% if row.fields.force_crate.value %}checked{% endif %} title="Force Crate"></td>
-    <td><input type="checkbox" name="do_not_tip" {% if row.fields.do_not_tip.value %}checked{% endif %} title="Do Not Tip"></td>
+    <td>
+        <div class="lot-dims lot-dims--refs lot-handling">
+            <div class="lot-dims-field"><span class="lot-dims-label">Fragility</span><select name="cpack" class="lot-input lot-input-sm cpack-badge cpack-field {{ row.fields.cpack.value|cpack_class }} {{ row.fields.cpack.value|dim_error_class }}"><option value="">—</option><option value="1"{% if row.fields.cpack.value == "1" %} selected{% endif %}>NF</option><option value="2"{% if row.fields.cpack.value == "2" %} selected{% endif %}>LF</option><option value="3"{% if row.fields.cpack.value == "3" %} selected{% endif %}>F</option><option value="4"{% if row.fields.cpack.value == "4" %} selected{% endif %}>VF</option><option value="PBO"{% if row.fields.cpack.value == "PBO" %} selected{% endif %}>PBO</option></select><span class="initial-ref{% if row.fields.cpack|show_ref %} initial-changed{% endif %}">{% if row.fields.cpack|show_ref %}{{ row.fields.cpack.original|cpack_label }}{% endif %}</span></div>
+            <div class="lot-dims-field"><span class="lot-dims-label">Crate</span><input type="checkbox" name="force_crate" {% if row.fields.force_crate.value %}checked{% endif %} title="Force Crate"><span class="initial-ref"></span></div>
+            <div class="lot-dims-field"><span class="lot-dims-label">DNT</span><input type="checkbox" name="do_not_tip" {% if row.fields.do_not_tip.value %}checked{% endif %} title="Do Not Tip"><span class="initial-ref"></span></div>
+        </div>
+    </td>
     <td><button type="submit" class="btn-icon override-btn" title="Save override"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button></td>
 </tr>
