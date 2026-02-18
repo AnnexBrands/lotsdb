@@ -57,7 +57,7 @@ def _make_paginated(items, page, page_size):
     total = len(items)
     total_pages = max(1, (total + page_size - 1) // page_size)
     start = (page - 1) * page_size
-    page_items = items[start:start + page_size]
+    page_items = items[start : start + page_size]
     return SimpleNamespace(
         items=page_items,
         page_number=page,
@@ -106,7 +106,15 @@ def find_seller_by_display_id(request, display_id):
 # --- Catalog (Event) service methods ---
 
 
-def list_catalogs(request, page=1, page_size=25, seller_id=None, use_cache=True, future_only=True, **filters):
+def list_catalogs(
+    request,
+    page=1,
+    page_size=25,
+    seller_id=None,
+    use_cache=True,
+    future_only=True,
+    **filters,
+):
     if seller_id is not None and not filters:
         cache_key = f"{CATALOGS_CACHE_KEY_PREFIX}{seller_id}"
         if use_cache:
@@ -121,15 +129,21 @@ def list_catalogs(request, page=1, page_size=25, seller_id=None, use_cache=True,
                     d["start_date"] = datetime.fromisoformat(d["start_date"])
                 items.append(SimpleNamespace(**d))
             if future_only:
-                items = [i for i in items if i.start_date and i.start_date.date() >= today]
+                items = [
+                    i for i in items if i.start_date and i.start_date.date() >= today
+                ]
             return _make_paginated(items, page, page_size)
 
         api = get_catalog_api(request)
         result = api.catalogs.list(page_number=1, page_size=200, SellerIds=seller_id)
         # Cache ALL events so future_only=False hits also benefit from cache
         projected_all = [
-            {"id": c.id, "title": c.title, "customer_catalog_id": c.customer_catalog_id,
-             "start_date": c.start_date.isoformat() if c.start_date else None}
+            {
+                "id": c.id,
+                "title": c.title,
+                "customer_catalog_id": c.customer_catalog_id,
+                "start_date": c.start_date.isoformat() if c.start_date else None,
+            }
             for c in result.items
         ]
         safe_cache_set(cache_key, projected_all)
@@ -161,7 +175,9 @@ def get_catalog(request, catalog_id):
 def list_lots_by_catalog(request, customer_catalog_id, page=1, page_size=25):
     api = get_catalog_api(request)
     return api.lots.list(
-        page_number=page, page_size=page_size, customer_catalog_id=str(customer_catalog_id)
+        page_number=page,
+        page_size=page_size,
+        customer_catalog_id=str(customer_catalog_id),
     )
 
 
@@ -192,9 +208,20 @@ def save_lot_override(request, lot_id, override_data):
     existing = lot.overriden_data[0] if lot.overriden_data else None
     if existing:
         for attr in (
-            "qty", "l", "w", "h", "wgt", "value", "cpack",
-            "description", "notes", "item_id", "force_crate",
-            "noted_conditions", "do_not_tip", "commodity_id",
+            "qty",
+            "l",
+            "w",
+            "h",
+            "wgt",
+            "value",
+            "cpack",
+            "description",
+            "notes",
+            "item_id",
+            "force_crate",
+            "noted_conditions",
+            "do_not_tip",
+            "commodity_id",
         ):
             val = getattr(existing, attr, None)
             if val is not None:
@@ -208,11 +235,7 @@ def save_lot_override(request, lot_id, override_data):
         overriden_data=[override],
         catalogs=lot.catalogs,
     )
-    payload = update_req.model_dump(by_alias=True, exclude_none=True, mode="json")
-    logger.info("save_lot_override lot=%s merged=%s payload_override=%s", lot_id, merged, payload.get("overridenData"))
     result = api.lots.update(lot_id, update_req)
-    if result.overriden_data:
-        logger.info("save_lot_override response do_not_tip=%s force_crate=%s", result.overriden_data[0].do_not_tip, result.overriden_data[0].force_crate)
     return result
 
 
@@ -225,7 +248,9 @@ def bulk_insert(request, data):
 def find_catalog_by_customer_id(request, customer_catalog_id):
     """Look up a catalog by its customer_catalog_id and return its internal id, or None."""
     api = get_catalog_api(request)
-    result = api.catalogs.list(page_number=1, page_size=1, CustomerCatalogId=customer_catalog_id)
+    result = api.catalogs.list(
+        page_number=1, page_size=1, CustomerCatalogId=customer_catalog_id
+    )
     if result.items:
         return result.items[0].id
     return None
@@ -236,7 +261,9 @@ def fetch_all_lots(request, customer_catalog_id):
     all_lots = []
     page = 1
     while True:
-        result = list_lots_by_catalog(request, customer_catalog_id, page=page, page_size=100)
+        result = list_lots_by_catalog(
+            request, customer_catalog_id, page=page, page_size=100
+        )
         all_lots.extend(result.items)
         if not result.has_next_page:
             break
@@ -312,7 +339,9 @@ def merge_catalog(request, bulk_request, catalog_id):
 
     # Resolve seller display ID for recovery entries and redirect
     catalog_obj = get_catalog(request, catalog_id)
-    seller_display_id = catalog_obj.sellers[0].customer_display_id if catalog_obj.sellers else ""
+    seller_display_id = (
+        catalog_obj.sellers[0].customer_display_id if catalog_obj.sellers else ""
+    )
 
     # Build lookup: customer_item_id → LotDto
     server_map = {}
@@ -341,13 +370,22 @@ def merge_catalog(request, bulk_request, catalog_id):
             try:
                 add_req = AddLotRequest(
                     customer_item_id=file_lot.customer_item_id,
-                    image_links=file_lot.image_links if hasattr(file_lot, 'image_links') else [],
+                    image_links=file_lot.image_links
+                    if hasattr(file_lot, "image_links")
+                    else [],
                     initial_data=LotDataDto(**_to_dict(file_lot.initial_data)),
-                    overriden_data=[LotDataDto(**_to_dict(o)) for o in (file_lot.overriden_data or [])],
-                    catalogs=[LotCatalogDto(
-                        catalog_id=catalog_id,
-                        lot_number=file_lot.lot_number if hasattr(file_lot, 'lot_number') else "",
-                    )],
+                    overriden_data=[
+                        LotDataDto(**_to_dict(o))
+                        for o in (file_lot.overriden_data or [])
+                    ],
+                    catalogs=[
+                        LotCatalogDto(
+                            catalog_id=catalog_id,
+                            lot_number=file_lot.lot_number
+                            if hasattr(file_lot, "lot_number")
+                            else "",
+                        )
+                    ],
                 )
                 create_lot(request, add_req)
                 added += 1
@@ -355,32 +393,47 @@ def merge_catalog(request, bulk_request, catalog_id):
                 failed += 1
                 errors.append(f"Failed to add lot {item_id}: {e}")
                 logger.warning("Merge: failed to create lot %s: %s", item_id, e)
-                cache_recovery_entry(request, {
-                    "customer_item_id": item_id,
-                    "lot_number": file_lot.lot_number if hasattr(file_lot, "lot_number") else "",
-                    "catalog_id": catalog_id,
-                    "customer_catalog_id": customer_catalog_id,
-                    "seller_display_id": seller_display_id,
-                    "operation": "create",
-                    "add_lot_request": add_req.model_dump(by_alias=True),
-                    "error_message": str(e),
-                    "timestamp": datetime.now(tz=datetime.now().astimezone().tzinfo).isoformat(),
-                })
+                cache_recovery_entry(
+                    request,
+                    {
+                        "customer_item_id": item_id,
+                        "lot_number": file_lot.lot_number
+                        if hasattr(file_lot, "lot_number")
+                        else "",
+                        "catalog_id": catalog_id,
+                        "customer_catalog_id": customer_catalog_id,
+                        "seller_display_id": seller_display_id,
+                        "operation": "create",
+                        "add_lot_request": add_req.model_dump(by_alias=True),
+                        "error_message": str(e),
+                        "timestamp": datetime.now(
+                            tz=datetime.now().astimezone().tzinfo
+                        ).isoformat(),
+                    },
+                )
 
         elif lots_differ(file_lot.initial_data, server_lot.initial_data):
             # Changed lot — delete and re-create, preserving overrides
             try:
-                saved_overrides = [LotDataDto(**_to_dict(o)) for o in (server_lot.overriden_data or [])]
+                saved_overrides = [
+                    LotDataDto(**_to_dict(o)) for o in (server_lot.overriden_data or [])
+                ]
                 delete_lot(request, server_lot.id)
                 add_req = AddLotRequest(
                     customer_item_id=file_lot.customer_item_id,
-                    image_links=file_lot.image_links if hasattr(file_lot, 'image_links') else [],
+                    image_links=file_lot.image_links
+                    if hasattr(file_lot, "image_links")
+                    else [],
                     initial_data=LotDataDto(**_to_dict(file_lot.initial_data)),
                     overriden_data=saved_overrides,
-                    catalogs=[LotCatalogDto(
-                        catalog_id=catalog_id,
-                        lot_number=file_lot.lot_number if hasattr(file_lot, 'lot_number') else "",
-                    )],
+                    catalogs=[
+                        LotCatalogDto(
+                            catalog_id=catalog_id,
+                            lot_number=file_lot.lot_number
+                            if hasattr(file_lot, "lot_number")
+                            else "",
+                        )
+                    ],
                 )
                 create_lot(request, add_req)
                 updated += 1
@@ -388,17 +441,24 @@ def merge_catalog(request, bulk_request, catalog_id):
                 failed += 1
                 errors.append(f"Failed to update lot {item_id}: {e}")
                 logger.warning("Merge: failed to update lot %s: %s", item_id, e)
-                cache_recovery_entry(request, {
-                    "customer_item_id": item_id,
-                    "lot_number": file_lot.lot_number if hasattr(file_lot, "lot_number") else "",
-                    "catalog_id": catalog_id,
-                    "customer_catalog_id": customer_catalog_id,
-                    "seller_display_id": seller_display_id,
-                    "operation": "update",
-                    "add_lot_request": add_req.model_dump(by_alias=True),
-                    "error_message": str(e),
-                    "timestamp": datetime.now(tz=datetime.now().astimezone().tzinfo).isoformat(),
-                })
+                cache_recovery_entry(
+                    request,
+                    {
+                        "customer_item_id": item_id,
+                        "lot_number": file_lot.lot_number
+                        if hasattr(file_lot, "lot_number")
+                        else "",
+                        "catalog_id": catalog_id,
+                        "customer_catalog_id": customer_catalog_id,
+                        "seller_display_id": seller_display_id,
+                        "operation": "update",
+                        "add_lot_request": add_req.model_dump(by_alias=True),
+                        "error_message": str(e),
+                        "timestamp": datetime.now(
+                            tz=datetime.now().astimezone().tzinfo
+                        ).isoformat(),
+                    },
+                )
 
         else:
             # Identical — skip
@@ -406,7 +466,9 @@ def merge_catalog(request, bulk_request, catalog_id):
 
     # If every lot failed, this is a systemic failure — re-raise so the view returns 500
     if failed > 0 and added == 0 and updated == 0 and unchanged == 0:
-        raise RuntimeError(f"All {failed} lots failed during merge. First error: {errors[0] if errors else 'unknown'}")
+        raise RuntimeError(
+            f"All {failed} lots failed during merge. First error: {errors[0] if errors else 'unknown'}"
+        )
 
     return {
         "added": added,
@@ -456,7 +518,10 @@ def cache_recovery_entry(request, entry_dict):
         entries.append(entry_dict)
         django_cache.set(key, json.dumps(entries), RECOVERY_CACHE_TTL)
     except Exception:
-        logger.warning("Failed to cache recovery entry for %s", entry_dict.get("customer_item_id", "?"))
+        logger.warning(
+            "Failed to cache recovery entry for %s",
+            entry_dict.get("customer_item_id", "?"),
+        )
 
 
 def get_recovery_entries(request):
@@ -509,7 +574,9 @@ def resolve_item(request, customer_item_id):
         return None
     catalog_id = lot.catalogs[0].catalog_id
     catalog = get_catalog(request, catalog_id)
-    seller_display_id = catalog.sellers[0].customer_display_id if catalog.sellers else None
+    seller_display_id = (
+        catalog.sellers[0].customer_display_id if catalog.sellers else None
+    )
     customer_catalog_id = catalog.customer_catalog_id
 
     # Compute lot_position: index in the event's embedded lots list
