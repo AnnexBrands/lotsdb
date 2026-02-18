@@ -153,3 +153,76 @@ class TestUploadCatalogMergePath:
         assert data["success"] is True
         assert data["merge"]["failed"] == 1
         assert len(data["warnings"]) == 1
+
+    @patch("catalog.views.imports.services.merge_catalog")
+    @patch("catalog.views.imports.services.find_catalog_by_customer_id", return_value=42)
+    @patch("catalog.views.imports.load_file")
+    def test_merge_with_failures_includes_recovery_url(self, mock_load, mock_find, mock_merge, client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        mock_catalog = SimpleNamespace(customer_catalog_id="123456")
+        mock_bulk_req = SimpleNamespace(catalogs=[mock_catalog])
+        mock_load.return_value = (mock_bulk_req, "1 catalog")
+        mock_merge.return_value = {
+            "added": 2, "updated": 1, "unchanged": 5, "failed": 1,
+            "errors": ["server error"],
+        }
+
+        f = SimpleUploadedFile("catalog.xlsx", b"fake", content_type="application/octet-stream")
+        resp = client.post("/imports/upload/", {"file": f})
+        data = json.loads(resp.content)
+        assert "recovery_url" in data
+        assert "/imports/recovery/" in data["recovery_url"]
+
+    @patch("catalog.views.imports.services.merge_catalog")
+    @patch("catalog.views.imports.services.find_catalog_by_customer_id", return_value=42)
+    @patch("catalog.views.imports.load_file")
+    def test_merge_deep_link_redirect(self, mock_load, mock_find, mock_merge, client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        mock_catalog = SimpleNamespace(customer_catalog_id="123456")
+        mock_bulk_req = SimpleNamespace(catalogs=[mock_catalog])
+        mock_load.return_value = (mock_bulk_req, "1 catalog")
+        mock_merge.return_value = {
+            "added": 3, "updated": 0, "unchanged": 0, "failed": 0, "errors": [],
+            "seller_display_id": "1874",
+            "customer_catalog_id": "123456",
+        }
+
+        f = SimpleUploadedFile("catalog.xlsx", b"fake", content_type="application/octet-stream")
+        resp = client.post("/imports/upload/", {"file": f})
+        data = json.loads(resp.content)
+        assert "seller=1874" in data["redirect"]
+        assert "event=123456" in data["redirect"]
+
+    @patch("catalog.views.imports.services.get_catalog")
+    @patch("catalog.views.imports.services.find_catalog_by_customer_id")
+    @patch("catalog.views.imports.services.bulk_insert")
+    @patch("catalog.views.imports.load_file")
+    def test_new_catalog_deep_link_redirect(self, mock_load, mock_bulk, mock_find, mock_get_cat, client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        mock_catalog = SimpleNamespace(customer_catalog_id="123456")
+        mock_bulk_req = SimpleNamespace(catalogs=[mock_catalog])
+        mock_load.return_value = (mock_bulk_req, "1 catalog, 5 lots")
+        mock_find.side_effect = [None, 42]  # first call: not existing, second: after insert
+        mock_get_cat.return_value = SimpleNamespace(
+            sellers=[SimpleNamespace(customer_display_id="1874")],
+        )
+
+        f = SimpleUploadedFile("catalog.xlsx", b"fake", content_type="application/octet-stream")
+        resp = client.post("/imports/upload/", {"file": f})
+        data = json.loads(resp.content)
+        assert "seller=1874" in data["redirect"]
+        assert "event=123456" in data["redirect"]
+
+    def test_oversized_file_returns_400(self, client):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # 1.1 MB file
+        f = SimpleUploadedFile("big.xlsx", b"x" * (1048576 + 1), content_type="application/octet-stream")
+        resp = client.post("/imports/upload/", {"file": f})
+        assert resp.status_code == 400
+        data = json.loads(resp.content)
+        assert data["success"] is False
+        assert "too large" in data["error"].lower()

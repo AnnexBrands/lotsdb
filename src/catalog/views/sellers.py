@@ -43,9 +43,16 @@ def seller_list(request):
         "paginated": result,
     }
 
-    # URL hydration: read ?seller=<display_id>&event=<catalog_id> for deep-link support
+    # Consume server-side pending toast (from search redirect)
+    pending_toast = request.session.pop("pending_toast", None)
+    if pending_toast:
+        import json
+        context["pending_toast"] = json.dumps(pending_toast)
+
+    # URL hydration: read ?seller=<display_id>&event=<catalog_id>&item=<item_id> for deep-link support
     seller_display_id = request.GET.get("seller", "").strip()
     event_catalog_id = request.GET.get("event", "").strip()
+    item_id = request.GET.get("item", "").strip()
 
     if seller_display_id:
         try:
@@ -73,9 +80,24 @@ def seller_list(request):
                                 context["selected_event_id"] = event_internal_id
                                 # Paginate embedded lots and fetch full LotDto
                                 all_lot_refs = event.lots or []
-                                page_lot_refs = all_lot_refs[:25]
+                                lot_page_size = 25
+
+                                # If ?item= present, find the correct page
+                                lot_page = 1
+                                if item_id:
+                                    context["selected_item_id"] = item_id
+                                    for i, ref in enumerate(all_lot_refs):
+                                        if hasattr(ref, "customer_item_id") and ref.customer_item_id == item_id:
+                                            lot_page = (i // lot_page_size) + 1
+                                            break
+                                        if hasattr(ref, "id"):
+                                            # Fallback: look up lot by ID to check item_id
+                                            pass
+
+                                start = (lot_page - 1) * lot_page_size
+                                page_lot_refs = all_lot_refs[start:start + lot_page_size]
                                 total = len(all_lot_refs)
-                                total_pages = max(1, (total + 24) // 25)
+                                total_pages = max(1, (total + lot_page_size - 1) // lot_page_size)
                                 lot_ids = [ref.id for ref in page_lot_refs]
                                 full_lots = services.get_lots_for_event(request, lot_ids)
                                 lot_rows = build_lot_table_rows(full_lots)
@@ -83,11 +105,11 @@ def seller_list(request):
                                 context["hydrate_lots"] = page_lot_refs
                                 context["hydrate_lot_rows"] = lot_rows
                                 context["hydrate_lots_paginated"] = {
-                                    "page_number": 1,
+                                    "page_number": lot_page,
                                     "total_pages": total_pages,
                                     "total_items": total,
-                                    "has_previous_page": False,
-                                    "has_next_page": 1 < total_pages,
+                                    "has_previous_page": lot_page > 1,
+                                    "has_next_page": lot_page < total_pages,
                                 }
                                 context["hydrate_lots_pagination_url"] = f"/panels/events/{event_internal_id}/lots/"
                     except ABConnectError:

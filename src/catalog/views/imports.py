@@ -60,11 +60,20 @@ def import_file(request):
     return HttpResponseRedirect(reverse("import_list"))
 
 
+MAX_UPLOAD_SIZE = 1048576  # 1 MB
+
+
 @require_POST
 def upload_catalog(request):
     uploaded = request.FILES.get("file")
     if not uploaded:
         return JsonResponse({"success": False, "error": "No file uploaded"}, status=400)
+
+    if uploaded.size > MAX_UPLOAD_SIZE:
+        return JsonResponse(
+            {"success": False, "error": "File too large. Maximum size: 1 MB"},
+            status=400,
+        )
 
     suffix = Path(uploaded.name).suffix.lower()
     if suffix not in SUPPORTED_EXTENSIONS:
@@ -92,7 +101,7 @@ def upload_catalog(request):
 
     customer_catalog_id = bulk_request.catalogs[0].customer_catalog_id
 
-    # Check if catalog already exists — merge path (US2)
+    # Check if catalog already exists — merge path
     existing_catalog_id = services.find_catalog_by_customer_id(request, customer_catalog_id)
     if existing_catalog_id:
         try:
@@ -102,9 +111,13 @@ def upload_catalog(request):
                 {"success": False, "error": f"Merge failed: {e}"},
                 status=500,
             )
+        # Build deep-link redirect URL
+        seller_id = result.get("seller_display_id", "")
+        event_id = result.get("customer_catalog_id", customer_catalog_id)
+        redirect_url = f"/?seller={seller_id}&event={event_id}" if seller_id else "/"
         response = {
             "success": True,
-            "redirect": "/",
+            "redirect": redirect_url,
             "merge": {
                 "added": result["added"],
                 "updated": result["updated"],
@@ -114,6 +127,8 @@ def upload_catalog(request):
         }
         if result.get("errors"):
             response["warnings"] = result["errors"]
+        if result["failed"] > 0:
+            response["recovery_url"] = reverse("recovery_dashboard")
         return JsonResponse(response)
 
     # New catalog path — bulk insert
@@ -122,5 +137,33 @@ def upload_catalog(request):
     except Exception as e:
         return JsonResponse({"success": False, "error": f"Import failed: {e}"}, status=500)
 
-    event_id = services.find_catalog_by_customer_id(request, customer_catalog_id)
-    return JsonResponse({"success": True, "redirect": "/"})
+    # Resolve seller info for deep-link redirect
+    internal_id = services.find_catalog_by_customer_id(request, customer_catalog_id)
+    redirect_url = "/"
+    if internal_id:
+        try:
+            catalog_obj = services.get_catalog(request, internal_id)
+            seller_display_id = catalog_obj.sellers[0].customer_display_id if catalog_obj.sellers else ""
+            if seller_display_id:
+                redirect_url = f"/?seller={seller_display_id}&event={customer_catalog_id}"
+        except Exception:
+            pass
+
+    return JsonResponse({"success": True, "redirect": redirect_url})
+
+
+def search_item(request):
+    """Search by customer item ID and redirect to deep-link."""
+    q = request.GET.get("q", "").strip()
+    if not q:
+        request.session["pending_toast"] = {"msg": "Enter an item ID", "type": "error"}
+        return HttpResponseRedirect("/")
+
+    result = services.resolve_item(request, q)
+    if result is None:
+        request.session["pending_toast"] = {"msg": f"Item '{q}' not found", "type": "error"}
+        return HttpResponseRedirect("/")
+
+    return HttpResponseRedirect(
+        f"/?seller={result['seller_display_id']}&event={result['customer_catalog_id']}&item={result['customer_item_id']}"
+    )

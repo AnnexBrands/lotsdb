@@ -1,0 +1,200 @@
+# API Contracts: Import Hardening (020)
+# Internal Django endpoints only (ABConnect API is external, not modified)
+
+openapi: "3.0.3"
+info:
+  title: LotsDB Import Hardening
+  version: "020"
+
+paths:
+  /search/item/:
+    get:
+      summary: Search for a lot by customer item ID and redirect to deep-link
+      description: >
+        Resolves customer_item_id → lot → catalog → seller via ABConnect API.
+        On success, redirects to /?seller={display_id}&event={catalog_id}&item={item_id}.
+        On not found, redirects back with a toast error.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Customer item ID to search for
+      responses:
+        "302":
+          description: Redirect to deep-link URL on success
+          headers:
+            Location:
+              schema:
+                type: string
+              example: "/?seller=1874&event=400160&item=2100000000"
+        "302 (not found)":
+          description: Redirect back to referrer with error toast via sessionStorage
+          headers:
+            Location:
+              schema:
+                type: string
+              example: "/"
+
+  /imports/upload/:
+    post:
+      summary: Upload a catalog file (new or merge)
+      description: >
+        Existing endpoint, modified to return deep-link redirect URL
+        and recovery page link when merge has failures.
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Catalog file (.xlsx, .csv, .json), max 1 MB
+      responses:
+        "200":
+          description: Success (new catalog or merge)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  redirect:
+                    type: string
+                    example: "/?seller=1874&event=400160"
+                  merge:
+                    type: object
+                    description: Present only for merge path
+                    properties:
+                      added:
+                        type: integer
+                      updated:
+                        type: integer
+                      unchanged:
+                        type: integer
+                      failed:
+                        type: integer
+                  recovery_url:
+                    type: string
+                    description: Present only when failed > 0
+                    example: "/imports/recovery/"
+                  warnings:
+                    type: array
+                    items:
+                      type: string
+                    description: Present only when merge has per-lot errors
+        "400":
+          description: Validation error (no file, bad type, parse error, empty, oversized)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error (merge failed, import failed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /imports/recovery/:
+    get:
+      summary: Recovery dashboard page
+      description: >
+        Full HTML page listing all cached failed lots for the current user.
+        Displays a table with item ID, lot number, error, and action buttons.
+      responses:
+        "200":
+          description: HTML page with recovery table or "no pending" message
+
+  /imports/recovery/check/{customer_item_id}/:
+    post:
+      summary: Check server state of a failed lot
+      description: >
+        HTMX endpoint. Queries ABConnect API for the customer_item_id and
+        returns an HTML fragment showing whether the lot exists on the server.
+      parameters:
+        - name: customer_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: HTML fragment with server state info
+          content:
+            text/html:
+              schema:
+                type: string
+              examples:
+                found:
+                  value: '<div class="recovery-status found">Lot exists on server (Qty: 5, 12x10x8)</div>'
+                missing:
+                  value: '<div class="recovery-status missing">Lot not found on server</div>'
+
+  /imports/recovery/retry/{customer_item_id}/:
+    post:
+      summary: Retry a failed lot create operation
+      description: >
+        HTMX endpoint. Re-attempts create_lot with the cached AddLotRequest.
+        If item already exists on server, returns a warning with skip/force options.
+        On success, removes the entry from cache and returns updated row.
+        On failure, returns error detail in the row.
+      parameters:
+        - name: customer_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: If true, delete existing lot before re-creating
+      responses:
+        "200":
+          description: HTML fragment — updated recovery table row
+          content:
+            text/html:
+              schema:
+                type: string
+              examples:
+                success:
+                  value: '<tr class="recovery-row success">...Retry successful...</tr>'
+                already_exists:
+                  value: '<tr class="recovery-row warning">...Item exists — Skip or Force Update...</tr>'
+                failed:
+                  value: '<tr class="recovery-row error">...Detailed error message...</tr>'
+
+  /imports/recovery/skip/{customer_item_id}/:
+    post:
+      summary: Skip a failed lot (remove from recovery queue)
+      description: >
+        HTMX endpoint. Removes the entry from the recovery cache without retrying.
+      parameters:
+        - name: customer_item_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Empty response or "all recovered" message if queue is now empty
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Unsupported file type: .txt. Accepted: .csv, .json, .xlsx"

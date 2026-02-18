@@ -1,0 +1,5 @@
+{% if missing %}
+<span class="recovery-status missing">Not found on server</span>
+{% else %}
+<span class="recovery-status found">Exists on server (Qty: {{ lot.initial_data.qty }}, {{ lot.initial_data.l }}x{{ lot.initial_data.w }}x{{ lot.initial_data.h }})</span>
+{% endif %}
