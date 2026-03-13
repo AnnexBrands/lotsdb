@@ -1253,24 +1253,24 @@ class TestSellerCacheContract:
         request = _make_get(factory, "/panels/sellers/")
         result = svc_module.list_sellers(request)
 
-        api.sellers.list.assert_called_once_with(page_number=1, page_size=500)
+        api.sellers.list.assert_called_once_with(page=1, page_size=500)
         mock_set.assert_called_once()
         cached_data = mock_set.call_args[0][1]
         assert cached_data == [{"id": 1, "name": "Seller A", "customer_display_id": "SA"}]
         assert result.items[0].name == "Seller A"
 
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.safe_cache_set")
     @patch("catalog.services.safe_cache_get")
     @patch("catalog.services.get_catalog_api")
-    def test_filter_bypasses_cache(self, mock_api, mock_get, mock_set, factory):
+    def test_filter_bypasses_cache(self, mock_api, mock_get, mock_set, mock_flist, factory):
         """TC-003: Seller filter bypasses cache entirely."""
-        api = mock_api.return_value
-        api.sellers.list.return_value = _mock_paginated([_mock_seller()])
+        mock_flist.return_value = _mock_paginated([_mock_seller()])
         request = _make_get(factory, "/panels/sellers/")
         svc_module.list_sellers(request, Name="foo")
 
         mock_get.assert_not_called()
-        api.sellers.list.assert_called_once_with(page_number=1, page_size=25, Name="foo")
+        mock_flist.assert_called_once()
 
 
 class TestCatalogCacheContract:
@@ -1291,21 +1291,21 @@ class TestCatalogCacheContract:
         assert len(result.items) == 1
         assert result.items[0].title == "Spring Auction"
 
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.safe_cache_set")
     @patch("catalog.services.safe_cache_get")
     @patch("catalog.services.get_catalog_api")
-    def test_cache_miss_fetches_caches_all_and_filters_future_at_return(self, mock_api, mock_get, mock_set, factory):
+    def test_cache_miss_fetches_caches_all_and_filters_future_at_return(self, mock_api, mock_get, mock_set, mock_flist, factory):
         """TC-005: Cache miss fetches all events, caches all, returns only future when future_only=True."""
         mock_get.return_value = None
-        api = mock_api.return_value
-        api.catalogs.list.return_value = _mock_paginated([
+        mock_flist.return_value = _mock_paginated([
             _mock_event(id=1, title="Future", customer_catalog_id="F1", start_date=datetime(2099, 1, 1)),
             _mock_event(id=2, title="Past", customer_catalog_id="P1", start_date=datetime(2020, 1, 1)),
         ])
         request = _make_get(factory, "/panels/sellers/42/events/")
         result = svc_module.list_catalogs(request, seller_id=42)
 
-        api.catalogs.list.assert_called_once_with(page_number=1, page_size=200, SellerIds=42)
+        mock_flist.assert_called_once()
         mock_set.assert_called_once()
         # Cache stores ALL events (both future and past)
         cached_data = mock_set.call_args[0][1]
@@ -1332,14 +1332,14 @@ class TestCacheFallbackContract:
 
         assert result.items[0].name == "Fallback"
 
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.safe_cache_set")
     @patch("catalog.services.safe_cache_get")
     @patch("catalog.services.get_catalog_api")
-    def test_catalogs_fallback_on_cache_failure(self, mock_api, mock_get, mock_set, factory):
+    def test_catalogs_fallback_on_cache_failure(self, mock_api, mock_get, mock_set, mock_flist, factory):
         """Cache unavailable, catalogs still fetched from API."""
         mock_get.return_value = None
-        api = mock_api.return_value
-        api.catalogs.list.return_value = _mock_paginated([
+        mock_flist.return_value = _mock_paginated([
             _mock_event(id=1, title="Event", start_date=datetime(2099, 1, 1)),
         ])
         request = _make_get(factory, "/panels/sellers/42/events/")

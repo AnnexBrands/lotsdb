@@ -1,9 +1,11 @@
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from ABConnect import ABConnectAPI
+import requests
+from ab.client import ABConnectAPI
 from django.contrib.auth import login as django_login
 from django.contrib.auth.models import User
 from django.core.cache import cache as django_cache
@@ -16,10 +18,22 @@ SELLERS_CACHE_KEY = "sellers_all"
 CATALOGS_CACHE_KEY_PREFIX = "catalogs_seller_"
 RECOVERY_CACHE_TTL = 86400  # 24 hours
 
+IMAGE_URL_TEMPLATE = "https://s3.amazonaws.com/static2.liveauctioneers.com/{house_id}/{catalog_id}/{lot_id}_{n}_m.jpg"
+IMAGE_SCAN_MAX_POSITIONS = 200
+IMAGE_SCAN_CONSECUTIVE_FAILURES = 3
+IMAGE_SCAN_TIMEOUT = 5
+IMAGE_SCAN_MAX_WORKERS = 10
+
 
 def login(request, username, password):
-    """Authenticate via ABConnect, then bridge to Django User."""
-    ABConnectAPI(request=request, username=username, password=password)
+    """Authenticate via AB SDK, then bridge to Django User."""
+    api = ABConnectAPI(request=request)
+    # Override credentials for this login attempt (env vars hold defaults).
+    # The first API call triggers _password_grant() with these values.
+    api._settings.username = username
+    api._settings.password = password
+    # Force authentication by triggering token acquisition
+    api._catalog._ensure_token()
     request.session["abc_username"] = username
 
     # Bridge to Django User for authorization support
@@ -34,19 +48,49 @@ def login(request, username, password):
 
 
 def get_catalog_api(request):
-    """Return a CatalogAPI instance backed by the session token.
+    """Return an ABConnectAPI instance backed by the session token.
 
     Caches on the request object so only one ABConnectAPI (and one
-    _load_token) is created per HTTP request.
+    token load) is created per HTTP request.
     """
     if not hasattr(request, "_catalog_api"):
-        request._catalog_api = ABConnectAPI(request=request).catalog
+        request._catalog_api = ABConnectAPI(request=request)
     return request._catalog_api
 
 
 def is_authenticated(request):
     """Check if the session has a valid token."""
-    return bool(request.session.get("abc_token"))
+    return bool(request.session.get("ab_token"))
+
+
+# --- Filtered list helper (SDK workaround) ---
+
+
+def _filtered_list(client, path, item_model_name, **params):
+    """Make a filtered paginated list request directly via the HTTP client.
+
+    The AB SDK's list() methods only accept page/page_size. This helper
+    bypasses them to pass arbitrary query params (filters) directly.
+    """
+    from ab.api.models.shared import PaginatedList
+    from ab.api import models as ab_models
+
+    response = client.request("GET", path, params=params)
+    if response is None:
+        return PaginatedList(
+            items=[], page_number=0, total_pages=0,
+            total_items=0, has_previous_page=False, has_next_page=False,
+        )
+    model_cls = getattr(ab_models, item_model_name)
+    items = [model_cls.model_validate(item) for item in response.get("items", [])]
+    return PaginatedList(
+        items=items,
+        page_number=response.get("pageNumber", 0),
+        total_pages=response.get("totalPages", 0),
+        total_items=response.get("totalItems", 0),
+        has_previous_page=response.get("hasPreviousPage", False),
+        has_next_page=response.get("hasNextPage", False),
+    )
 
 
 # --- Seller service methods ---
@@ -71,7 +115,10 @@ def _make_paginated(items, page, page_size):
 def list_sellers(request, page=1, page_size=25, **filters):
     if filters:
         api = get_catalog_api(request)
-        return api.sellers.list(page_number=page, page_size=page_size, **filters)
+        return _filtered_list(
+            api.sellers._client, "/Seller", "SellerExpandedDto",
+            pageNumber=page, pageSize=page_size, **filters,
+        )
 
     cached = safe_cache_get(SELLERS_CACHE_KEY)
     if cached is not None:
@@ -79,7 +126,7 @@ def list_sellers(request, page=1, page_size=25, **filters):
         return _make_paginated(items, page, page_size)
 
     api = get_catalog_api(request)
-    result = api.sellers.list(page_number=1, page_size=500)
+    result = api.sellers.list(page=1, page_size=500)
     projected = [
         {"id": s.id, "name": s.name, "customer_display_id": s.customer_display_id}
         for s in result.items
@@ -97,7 +144,10 @@ def get_seller(request, seller_id):
 def find_seller_by_display_id(request, display_id):
     """Look up a seller by customer_display_id and return the seller object, or None."""
     api = get_catalog_api(request)
-    result = api.sellers.list(page_number=1, page_size=1, CustomerDisplayId=display_id)
+    result = _filtered_list(
+        api.sellers._client, "/Seller", "SellerExpandedDto",
+        pageNumber=1, pageSize=1, CustomerDisplayId=display_id,
+    )
     if result.items:
         return result.items[0]
     return None
@@ -135,7 +185,10 @@ def list_catalogs(
             return _make_paginated(items, page, page_size)
 
         api = get_catalog_api(request)
-        result = api.catalogs.list(page_number=1, page_size=200, SellerIds=seller_id)
+        result = _filtered_list(
+            api.catalog._client, "/Catalog", "CatalogExpandedDto",
+            pageNumber=1, pageSize=200, SellerIds=seller_id,
+        )
         # Cache ALL events so future_only=False hits also benefit from cache
         projected_all = [
             {
@@ -159,14 +212,18 @@ def list_catalogs(
         return _make_paginated(items, page, page_size)
 
     api = get_catalog_api(request)
+    filter_params = dict(filters)
     if seller_id is not None:
-        filters["SellerIds"] = seller_id
-    return api.catalogs.list(page_number=page, page_size=page_size, **filters)
+        filter_params["SellerIds"] = seller_id
+    return _filtered_list(
+        api.catalog._client, "/Catalog", "CatalogExpandedDto",
+        pageNumber=page, pageSize=page_size, **filter_params,
+    )
 
 
 def get_catalog(request, catalog_id):
     api = get_catalog_api(request)
-    return api.catalogs.get(catalog_id)
+    return api.catalog.get(catalog_id)
 
 
 # --- Lot service methods ---
@@ -174,9 +231,9 @@ def get_catalog(request, catalog_id):
 
 def list_lots_by_catalog(request, customer_catalog_id, page=1, page_size=25):
     api = get_catalog_api(request)
-    return api.lots.list(
-        page_number=page,
-        page_size=page_size,
+    return _filtered_list(
+        api.lots._client, "/Lot", "LotDto",
+        pageNumber=page, pageSize=page_size,
         customer_catalog_id=str(customer_catalog_id),
     )
 
@@ -196,60 +253,48 @@ def get_lots_for_event(request, lot_ids):
 
 def save_lot_override(request, lot_id, override_data):
     """Update a lot's overriden_data, merging with existing overrides to preserve fields not in override_data."""
-    from ABConnect.api.models.catalog import UpdateLotRequest, LotDataDto
-
     api = get_catalog_api(request)
     lot = api.lots.get(lot_id)
 
     # Merge: start with existing override values, then overlay new values on top.
-    # This prevents inline saves from clobbering description/notes overrides
-    # and modal text saves from clobbering dimension/flag overrides.
     merged = {}
     existing = lot.overriden_data[0] if lot.overriden_data else None
     if existing:
         for attr in (
-            "qty",
-            "l",
-            "w",
-            "h",
-            "wgt",
-            "value",
-            "cpack",
-            "description",
-            "notes",
-            "item_id",
-            "force_crate",
-            "noted_conditions",
-            "do_not_tip",
-            "commodity_id",
+            "qty", "l", "w", "h", "wgt", "value",
+            "cpack", "description", "notes", "item_id",
+            "force_crate", "noted_conditions", "do_not_tip", "commodity_id",
         ):
             val = getattr(existing, attr, None)
             if val is not None:
                 merged[attr] = val
     merged.update(override_data)
 
-    override = LotDataDto(**merged)
-    update_req = UpdateLotRequest(
-        customer_item_id=lot.customer_item_id,
-        image_links=[img.link for img in lot.image_links] if lot.image_links else [],
-        overriden_data=[override],
-        catalogs=lot.catalogs,
-    )
-    result = api.lots.update(lot_id, update_req)
+    update_req = {
+        "customerItemId": lot.customer_item_id,
+        "imageLinks": [img.link for img in lot.image_links] if lot.image_links else [],
+        "overridenData": [merged],
+        "catalogs": [
+            c.model_dump(by_alias=True) if hasattr(c, "model_dump") else c
+            for c in (lot.catalogs or [])
+        ],
+    }
+    result = api.lots.update(lot_id, data=update_req)
     return result
 
 
 def bulk_insert(request, data):
     """Insert catalog data via the bulk endpoint."""
     api = get_catalog_api(request)
-    return api.bulk.insert(data)
+    return api.catalog.bulk_insert(data=data)
 
 
 def find_catalog_by_customer_id(request, customer_catalog_id):
     """Look up a catalog by its customer_catalog_id and return its internal id, or None."""
     api = get_catalog_api(request)
-    result = api.catalogs.list(
-        page_number=1, page_size=1, CustomerCatalogId=customer_catalog_id
+    result = _filtered_list(
+        api.catalog._client, "/Catalog", "CatalogExpandedDto",
+        pageNumber=1, pageSize=1, CustomerCatalogId=customer_catalog_id,
     )
     if result.items:
         return result.items[0].id
@@ -274,7 +319,7 @@ def fetch_all_lots(request, customer_catalog_id):
 def create_lot(request, add_lot_request):
     """Create a single lot via the API."""
     api = get_catalog_api(request)
-    return api.lots.create(add_lot_request)
+    return api.lots.create(data=add_lot_request)
 
 
 def delete_lot(request, lot_id):
@@ -289,6 +334,13 @@ _COMPARE_FIELDS_STR = ("cpack",)
 _COMPARE_FIELDS_BOOL = ("force_crate",)
 
 
+def _get_field(obj, field, default=None):
+    """Get a field from a dict or object."""
+    if isinstance(obj, dict):
+        return obj.get(field, default)
+    return getattr(obj, field, default)
+
+
 def lots_differ(file_data, server_data):
     """Compare dimensional/shipping fields between file and server initial_data.
 
@@ -296,28 +348,46 @@ def lots_differ(file_data, server_data):
     Normalizes None to 0 (numeric), "" (string), False (bool).
     """
     for field in _COMPARE_FIELDS_NUMERIC:
-        fv = getattr(file_data, field, None) or 0
-        sv = getattr(server_data, field, None) or 0
+        fv = _get_field(file_data, field) or 0
+        sv = _get_field(server_data, field) or 0
         if float(fv) != float(sv):
             return True
     for field in _COMPARE_FIELDS_STR:
-        fv = getattr(file_data, field, None) or ""
-        sv = getattr(server_data, field, None) or ""
+        fv = _get_field(file_data, field) or ""
+        sv = _get_field(server_data, field) or ""
         if str(fv) != str(sv):
             return True
     for field in _COMPARE_FIELDS_BOOL:
-        fv = bool(getattr(file_data, field, None) or False)
-        sv = bool(getattr(server_data, field, None) or False)
+        fv = bool(_get_field(file_data, field) or False)
+        sv = bool(_get_field(server_data, field) or False)
         if fv != sv:
             return True
     return False
 
 
 def _to_dict(obj):
-    """Convert a LotDataDto or SimpleNamespace to a dict for Pydantic model construction."""
+    """Convert a model or SimpleNamespace to a dict."""
     if hasattr(obj, "model_dump"):
         return obj.model_dump(by_alias=False, exclude_none=True)
     return {k: v for k, v in vars(obj).items() if v is not None}
+
+
+def _safe_int(value, default=0):
+    """Convert to int, returning default if not numeric."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def _scan_merge_images(seller_display_id, customer_catalog_id, item_id):
+    """Scan images for a lot during merge, handling non-numeric IDs gracefully."""
+    house = _safe_int(seller_display_id)
+    cat = _safe_int(customer_catalog_id)
+    lot = _safe_int(item_id)
+    if house and cat and lot:
+        return scan_lot_images(house, cat, lot)
+    return []
 
 
 def merge_catalog(request, bulk_request, catalog_id):
@@ -331,10 +401,8 @@ def merge_catalog(request, bulk_request, catalog_id):
 
     Returns dict with {added, updated, unchanged, failed, errors, catalog_id}.
     """
-    from ABConnect.api.models.catalog import AddLotRequest, LotDataDto, LotCatalogDto
-
     # Fetch all server lots for this catalog
-    customer_catalog_id = bulk_request.catalogs[0].customer_catalog_id
+    customer_catalog_id = bulk_request["catalogs"][0]["customer_catalog_id"]
     server_lots = fetch_all_lots(request, customer_catalog_id)
 
     # Resolve seller display ID for recovery entries and redirect
@@ -351,10 +419,11 @@ def merge_catalog(request, bulk_request, catalog_id):
 
     # Build file lots lookup — deduplicate, keep first occurrence only
     file_map = {}
-    for catalog in bulk_request.catalogs:
-        for lot in catalog.lots:
-            if lot.customer_item_id not in file_map:
-                file_map[lot.customer_item_id] = lot
+    for catalog in bulk_request["catalogs"]:
+        for lot in catalog["lots"]:
+            item_id = lot["customer_item_id"]
+            if item_id not in file_map:
+                file_map[item_id] = SimpleNamespace(**lot)
 
     added = 0
     updated = 0
@@ -367,26 +436,21 @@ def merge_catalog(request, bulk_request, catalog_id):
 
         if server_lot is None:
             # New lot — create individually
+            add_req = None
             try:
-                add_req = AddLotRequest(
-                    customer_item_id=file_lot.customer_item_id,
-                    image_links=file_lot.image_links
-                    if hasattr(file_lot, "image_links")
-                    else [],
-                    initial_data=LotDataDto(**_to_dict(file_lot.initial_data)),
-                    overriden_data=[
-                        LotDataDto(**_to_dict(o))
-                        for o in (file_lot.overriden_data or [])
+                image_links = _scan_merge_images(seller_display_id, customer_catalog_id, item_id)
+                add_req = {
+                    "customerItemId": file_lot.customer_item_id,
+                    "imageLinks": image_links,
+                    "initialData": _to_dict(file_lot.initial_data) if hasattr(file_lot.initial_data, "__dict__") else file_lot.initial_data,
+                    "overridenData": [],
+                    "catalogs": [
+                        {
+                            "catalogId": catalog_id,
+                            "lotNumber": getattr(file_lot, "lot_number", ""),
+                        }
                     ],
-                    catalogs=[
-                        LotCatalogDto(
-                            catalog_id=catalog_id,
-                            lot_number=file_lot.lot_number
-                            if hasattr(file_lot, "lot_number")
-                            else "",
-                        )
-                    ],
-                )
+                }
                 create_lot(request, add_req)
                 added += 1
             except Exception as e:
@@ -397,14 +461,12 @@ def merge_catalog(request, bulk_request, catalog_id):
                     request,
                     {
                         "customer_item_id": item_id,
-                        "lot_number": file_lot.lot_number
-                        if hasattr(file_lot, "lot_number")
-                        else "",
+                        "lot_number": getattr(file_lot, "lot_number", ""),
                         "catalog_id": catalog_id,
                         "customer_catalog_id": customer_catalog_id,
                         "seller_display_id": seller_display_id,
                         "operation": "create",
-                        "add_lot_request": add_req.model_dump(by_alias=True),
+                        "add_lot_request": add_req,
                         "error_message": str(e),
                         "timestamp": datetime.now(
                             tz=datetime.now().astimezone().tzinfo
@@ -414,27 +476,25 @@ def merge_catalog(request, bulk_request, catalog_id):
 
         elif lots_differ(file_lot.initial_data, server_lot.initial_data):
             # Changed lot — delete and re-create, preserving overrides
+            add_req = None
             try:
                 saved_overrides = [
-                    LotDataDto(**_to_dict(o)) for o in (server_lot.overriden_data or [])
+                    _to_dict(o) for o in (server_lot.overriden_data or [])
                 ]
                 delete_lot(request, server_lot.id)
-                add_req = AddLotRequest(
-                    customer_item_id=file_lot.customer_item_id,
-                    image_links=file_lot.image_links
-                    if hasattr(file_lot, "image_links")
-                    else [],
-                    initial_data=LotDataDto(**_to_dict(file_lot.initial_data)),
-                    overriden_data=saved_overrides,
-                    catalogs=[
-                        LotCatalogDto(
-                            catalog_id=catalog_id,
-                            lot_number=file_lot.lot_number
-                            if hasattr(file_lot, "lot_number")
-                            else "",
-                        )
+                image_links = _scan_merge_images(seller_display_id, customer_catalog_id, item_id)
+                add_req = {
+                    "customerItemId": file_lot.customer_item_id,
+                    "imageLinks": image_links,
+                    "initialData": _to_dict(file_lot.initial_data) if hasattr(file_lot.initial_data, "__dict__") else file_lot.initial_data,
+                    "overridenData": saved_overrides,
+                    "catalogs": [
+                        {
+                            "catalogId": catalog_id,
+                            "lotNumber": getattr(file_lot, "lot_number", ""),
+                        }
                     ],
-                )
+                }
                 create_lot(request, add_req)
                 updated += 1
             except Exception as e:
@@ -445,14 +505,12 @@ def merge_catalog(request, bulk_request, catalog_id):
                     request,
                     {
                         "customer_item_id": item_id,
-                        "lot_number": file_lot.lot_number
-                        if hasattr(file_lot, "lot_number")
-                        else "",
+                        "lot_number": getattr(file_lot, "lot_number", ""),
                         "catalog_id": catalog_id,
                         "customer_catalog_id": customer_catalog_id,
                         "seller_display_id": seller_display_id,
                         "operation": "update",
-                        "add_lot_request": add_req.model_dump(by_alias=True),
+                        "add_lot_request": add_req,
                         "error_message": str(e),
                         "timestamp": datetime.now(
                             tz=datetime.now().astimezone().tzinfo
@@ -486,8 +544,14 @@ def search_lots(request, query, page=1, page_size=25):
     """Search lots by customer item ID and lot number, combining results."""
     api = get_catalog_api(request)
 
-    by_item = api.lots.list(page_number=page, page_size=page_size, CustomerItemId=query)
-    by_lot_num = api.lots.list(page_number=page, page_size=page_size, LotNumber=query)
+    by_item = _filtered_list(
+        api.lots._client, "/Lot", "LotDto",
+        pageNumber=page, pageSize=page_size, CustomerItemId=query,
+    )
+    by_lot_num = _filtered_list(
+        api.lots._client, "/Lot", "LotDto",
+        pageNumber=page, pageSize=page_size, LotNumber=query,
+    )
 
     # Merge and deduplicate by lot id
     seen = set()
@@ -500,6 +564,74 @@ def search_lots(request, query, page=1, page_size=25):
     by_item.items = merged
     by_item.total_items = len(merged)
     return by_item
+
+
+# --- Image scanning ---
+
+
+def scan_lot_images(house_id, catalog_id, lot_id):
+    """Probe CDN URLs for a single lot to discover available images.
+
+    Sends HTTP HEAD requests to sequential image positions starting at 1.
+    Stops after 3 consecutive non-2xx responses or 200 positions.
+    Returns list of verified image URLs.
+    """
+    valid_urls = []
+    consecutive_failures = 0
+
+    for n in range(1, IMAGE_SCAN_MAX_POSITIONS + 1):
+        url = IMAGE_URL_TEMPLATE.format(
+            house_id=house_id, catalog_id=catalog_id,
+            lot_id=lot_id, n=n,
+        )
+        try:
+            resp = requests.head(url, timeout=IMAGE_SCAN_TIMEOUT)
+            if 200 <= resp.status_code < 300:
+                valid_urls.append(url)
+                consecutive_failures = 0
+            else:
+                consecutive_failures += 1
+        except Exception:
+            logger.warning("Image scan network error for %s", url)
+            consecutive_failures += 1
+
+        if consecutive_failures >= IMAGE_SCAN_CONSECUTIVE_FAILURES:
+            break
+
+    return valid_urls
+
+
+def scan_images_for_catalog(lots, max_workers=IMAGE_SCAN_MAX_WORKERS):
+    """Scan images for all lots in a catalog import, parallelized across lots.
+
+    Args:
+        lots: List of (house_id, catalog_id, lot_id) tuples.
+        max_workers: Thread pool size.
+
+    Returns:
+        Dict mapping lot_id to list of verified image URLs.
+    """
+    results = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_lot = {
+            executor.submit(scan_lot_images, house, cat, lot): lot
+            for house, cat, lot in lots
+        }
+        for future in as_completed(future_to_lot):
+            lot_id = future_to_lot[future]
+            try:
+                results[lot_id] = future.result()
+            except Exception:
+                logger.warning("Image scan failed for lot %s", lot_id)
+                results[lot_id] = []
+
+    total_images = sum(len(urls) for urls in results.values())
+    logger.info(
+        "Image scan complete: %d lots, %d images found",
+        len(results), total_images,
+    )
+    return results
 
 
 # --- Recovery cache helpers ---
@@ -566,7 +698,10 @@ def resolve_item(request, customer_item_id):
     Returns None if not found.
     """
     api = get_catalog_api(request)
-    result = api.lots.list(CustomerItemId=customer_item_id, page_size=1)
+    result = _filtered_list(
+        api.lots._client, "/Lot", "LotDto",
+        CustomerItemId=customer_item_id, pageSize=1,
+    )
     if not result.items:
         return None
     lot = result.items[0]

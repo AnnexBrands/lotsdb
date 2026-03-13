@@ -45,7 +45,7 @@ class TestStaffPassesThrough:
     def test_staff_user_gets_200(self, middleware, factory):
         user = User.objects.create_user(username="staff@test.com", is_staff=True)
         session = SessionStore()
-        session["abc_token"] = {"access_token": "t", "expires_at": 9999999999}
+        session["ab_token"] = {"access_token": "t", "expires_at": 9999999999}
         session["abc_username"] = "staff@test.com"
         session.save()
 
@@ -81,7 +81,7 @@ class TestLegacySessionRebridge:
 
     def test_rebridge_creates_user_and_continues(self, middleware, factory):
         session = SessionStore()
-        session["abc_token"] = {"access_token": "t", "expires_at": 9999999999}
+        session["ab_token"] = {"access_token": "t", "expires_at": 9999999999}
         session["abc_username"] = "legacy@test.com"
         session.save()
 
@@ -96,7 +96,7 @@ class TestLegacySessionRebridge:
 
     def test_rebridge_without_abc_username_flushes_session(self, middleware, factory):
         session = SessionStore()
-        session["abc_token"] = {"access_token": "t", "expires_at": 9999999999}
+        session["ab_token"] = {"access_token": "t", "expires_at": 9999999999}
         # No abc_username
         session.save()
 
@@ -114,7 +114,7 @@ class TestNonStaffRedirectsToNoAccess:
     def test_non_staff_redirected(self, middleware, factory):
         user = User.objects.create_user(username="noaccess@test.com", is_staff=False)
         session = SessionStore()
-        session["abc_token"] = {"access_token": "t", "expires_at": 9999999999}
+        session["ab_token"] = {"access_token": "t", "expires_at": 9999999999}
         session["abc_username"] = "noaccess@test.com"
         session.save()
 
@@ -127,7 +127,7 @@ class TestNonStaffRedirectsToNoAccess:
     def test_non_staff_panels_endpoint_redirected(self, middleware, factory):
         user = User.objects.create_user(username="noaccess2@test.com", is_staff=False)
         session = SessionStore()
-        session["abc_token"] = {"access_token": "t", "expires_at": 9999999999}
+        session["ab_token"] = {"access_token": "t", "expires_at": 9999999999}
         session["abc_username"] = "noaccess2@test.com"
         session.save()
 

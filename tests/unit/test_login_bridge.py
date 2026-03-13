@@ -1,6 +1,6 @@
 """Unit tests for the login bridge (services.login → Django User)."""
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 from django.contrib.auth.models import User

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.core.management.base import BaseCommand
 
-from ABConnect import ABConnectAPI
+from ab.client import ABConnectAPI
 from catalog.importers import load_file, list_import_files
 
 FILES_DIR = Path(__file__).resolve().parent.parent.parent / "FILES"
@@ -64,7 +64,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING("[DRY RUN] Skipping API call"))
             else:
                 try:
-                    api.catalog.bulk.insert(request)
+                    api.catalog.bulk_insert(data=request)
                     self.stdout.write(self.style.SUCCESS("Imported successfully"))
                 except Exception as e:
                     self.stderr.write(self.style.ERROR(f"API error: {e}"))

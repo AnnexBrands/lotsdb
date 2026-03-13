@@ -29,10 +29,11 @@ def _mock_paginated(items):
 
 class TestResolveItem:
     @patch("catalog.services.get_catalog")
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.get_catalog_api")
-    def test_item_found_returns_correct_dict(self, mock_api, mock_get_cat, db):
+    def test_item_found_returns_correct_dict(self, mock_api, mock_flist, mock_get_cat, db):
         lot = _mock_lot(100, "ITEM-1", 42)
-        mock_api.return_value.lots.list.return_value = _mock_paginated([lot])
+        mock_flist.return_value = _mock_paginated([lot])
         catalog_lots = [
             SimpleNamespace(id=99),
             SimpleNamespace(id=100),
@@ -51,9 +52,10 @@ class TestResolveItem:
         assert result["seller_display_id"] == "1874"
         assert result["lot_position"] == 1  # index 1 in catalog_lots
 
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.get_catalog_api")
-    def test_item_not_found_returns_none(self, mock_api, db):
-        mock_api.return_value.lots.list.return_value = _mock_paginated([])
+    def test_item_not_found_returns_none(self, mock_api, mock_flist, db):
+        mock_flist.return_value = _mock_paginated([])
 
         request = SimpleNamespace(session={"abc_username": "test"})
         result = resolve_item(request, "MISSING")
@@ -61,10 +63,11 @@ class TestResolveItem:
         assert result is None
 
     @patch("catalog.services.get_catalog")
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.get_catalog_api")
-    def test_lot_position_first(self, mock_api, mock_get_cat, db):
+    def test_lot_position_first(self, mock_api, mock_flist, mock_get_cat, db):
         lot = _mock_lot(50, "FIRST", 10)
-        mock_api.return_value.lots.list.return_value = _mock_paginated([lot])
+        mock_flist.return_value = _mock_paginated([lot])
         catalog_lots = [SimpleNamespace(id=50), SimpleNamespace(id=51)]
         mock_get_cat.return_value = _mock_catalog(10, "EVT-10", "S1", lots=catalog_lots)
 
@@ -73,10 +76,11 @@ class TestResolveItem:
         assert result["lot_position"] == 0
 
     @patch("catalog.services.get_catalog")
+    @patch("catalog.services._filtered_list")
     @patch("catalog.services.get_catalog_api")
-    def test_lot_position_last(self, mock_api, mock_get_cat, db):
+    def test_lot_position_last(self, mock_api, mock_flist, mock_get_cat, db):
         lot = _mock_lot(53, "LAST", 10)
-        mock_api.return_value.lots.list.return_value = _mock_paginated([lot])
+        mock_flist.return_value = _mock_paginated([lot])
         catalog_lots = [SimpleNamespace(id=50), SimpleNamespace(id=51), SimpleNamespace(id=53)]
         mock_get_cat.return_value = _mock_catalog(10, "EVT-10", "S1", lots=catalog_lots)
 

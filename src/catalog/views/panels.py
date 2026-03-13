@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from django.shortcuts import render
 
-from ABConnect.exceptions import ABConnectError
+from ab.exceptions import ABConnectError
 from catalog import services
 from catalog.cache import safe_cache_get
 from catalog.forms import OverrideForm
