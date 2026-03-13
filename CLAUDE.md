@@ -21,6 +21,7 @@ Auto-generated from all feature plans. Last updated: 2026-02-10
 - No new storage — all data from ABConnect API; SQLite3 for sessions only (017-lots-modal-overhaul)
 - Python 3.14, Django 5.2 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), redis 7.1.1 (018-critical-bug-fixes)
 - SQLite3 (sessions + Django User table), Redis (cache — existing `default` backend) (020-import-hardening)
+- Python 3.14, Django 5.2 + AB SDK 0.1.0 (editable install from `/usr/src/pkgs/AB`), HTMX 2.0.4 (CDN), redis 7.1.1, openpyxl (for FileLoader replacement) (021-replace-abconnect-package)
 
 - Python 3.14, Django 5 + Django 5, HTMX (CDN), ABConnectTools 0.2.1 (editable install) (001-auction-catalog-manager)
 
@@ -40,9 +41,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.14, Django 5: Follow standard conventions
 
 ## Recent Changes
+- 021-replace-abconnect-package: Added Python 3.14, Django 5.2 + AB SDK 0.1.0 (editable install from `/usr/src/pkgs/AB`), HTMX 2.0.4 (CDN), redis 7.1.1, openpyxl (for FileLoader replacement)
 - 020-import-hardening: Added Python 3.14, Django 5.2 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), redis 7.1.1
 - 019-restore-catalog-import: Added Python 3.14, Django 5.2 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install)
-- 018-critical-bug-fixes: Added Python 3.14, Django 5.2 + HTMX 2.0.4 (CDN), ABConnectTools 0.2.1 (editable install), redis 7.1.1
 
 
 <!-- MANUAL ADDITIONS START -->

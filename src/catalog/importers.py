@@ -1,21 +1,15 @@
 """Catalog file import logic.
 
-Adapted from ABConnectTools examples/catalog.py.
-Transforms flat spreadsheet rows into nested BulkInsertRequest for the Catalog API.
+Transforms flat spreadsheet rows into nested bulk insert dicts for the Catalog API.
 """
 
+import csv
+import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from ABConnect import FileLoader
-from ABConnect.api.models.catalog import (
-    BulkInsertRequest,
-    BulkInsertCatalogRequest,
-    BulkInsertSellerRequest,
-    BulkInsertLotRequest,
-    LotDataDto,
-)
+from catalog.services import scan_lot_images
 
 
 # =============================================================================
@@ -25,7 +19,6 @@ from ABConnect.api.models.catalog import (
 CPACK_MAP = {"nf": "1", "lf": "2", "f": "3", "vf": "4", "pbo": "pbo"}
 DEFAULT_CPACK = "3"
 DEFAULT_AGENT = "DLC"
-IMAGE_URL_TEMPLATE = "https://s3.amazonaws.com/static2.liveauctioneers.com/{house_id}/{catalog_id}/{lot_id}_1_m.jpg"
 
 SUPPORTED_EXTENSIONS = {".xlsx", ".csv", ".json"}
 
@@ -97,11 +90,51 @@ def convert_cpack(value: str) -> str:
     return CPACK_MAP.get(value.lower().strip(), DEFAULT_CPACK)
 
 
-def build_image_url(house_id: int, catalog_id: int, lot_id: int) -> str:
-    """Build image URL from IDs."""
-    return IMAGE_URL_TEMPLATE.format(
-        house_id=house_id, catalog_id=catalog_id, lot_id=lot_id
-    )
+# =============================================================================
+# File Loading
+# =============================================================================
+
+
+def _load_xlsx(path: Path) -> list[dict]:
+    """Load an XLSX file and return list of dicts (one per row)."""
+    import openpyxl
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    wb.close()
+    if not rows:
+        return []
+    headers = [str(h) if h is not None else "" for h in rows[0]]
+    return [dict(zip(headers, row)) for row in rows[1:]]
+
+
+def _load_csv(path: Path) -> list[dict]:
+    """Load a CSV file and return list of dicts."""
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        return list(reader)
+
+
+def _load_json(path: Path) -> list[dict]:
+    """Load a JSON file and return list of dicts."""
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return data
+    return [data]
+
+
+def _load_data(path: Path) -> list[dict]:
+    """Load data from a file based on its extension."""
+    ext = path.suffix.lower()
+    if ext == ".xlsx":
+        return _load_xlsx(path)
+    elif ext == ".csv":
+        return _load_csv(path)
+    elif ext == ".json":
+        return _load_json(path)
+    raise ValueError(f"Unsupported file type: {ext}")
 
 
 # =============================================================================
@@ -110,7 +143,7 @@ def build_image_url(house_id: int, catalog_id: int, lot_id: int) -> str:
 
 
 class CatalogDataBuilder:
-    """Builds BulkInsertRequest from spreadsheet rows."""
+    """Builds bulk insert dict from spreadsheet rows."""
 
     def __init__(self, agent: str = DEFAULT_AGENT):
         self.agent = agent
@@ -137,8 +170,8 @@ class CatalogDataBuilder:
         self.catalogs_data[catalog_id] = {
             "customer_catalog_id": str(catalog_id),
             "title": row.get("Catalog Title", ""),
-            "start_date": start_date,
-            "end_date": end_date,
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
             "agent": row.get("Agent", self.agent),
         }
 
@@ -173,52 +206,43 @@ class CatalogDataBuilder:
 
         description = f"{lot_number} {lot_title}".strip()
 
-        initial_data = LotDataDto(
-            qty=qty, h=h, w=w, l=depth, wgt=wgt,
-            cpack=cpack, description=description,
-            notes=lot_description, force_crate=force_crate,
-        )
+        initial_data = {
+            "qty": qty, "h": h, "w": w, "l": depth, "wgt": wgt,
+            "cpack": cpack, "description": description,
+            "notes": lot_description, "force_crate": force_crate,
+        }
 
-        override_data = LotDataDto(
-            qty=qty, h=h, w=w, l=depth, wgt=wgt,
-            cpack=cpack, description=description,
-            notes=lot_description, force_crate=force_crate,
-        )
+        image_links = scan_lot_images(seller_id, catalog_id, lot_id)
 
-        image_url = build_image_url(seller_id, catalog_id, lot_id)
-
-        lot = BulkInsertLotRequest(
-            customer_item_id=str(lot_id),
-            lot_number=lot_number,
-            initial_data=initial_data,
-            overriden_data=[override_data],
-            image_links=[image_url],
-        )
+        lot = {
+            "customer_item_id": str(lot_id),
+            "lot_number": lot_number,
+            "initial_data": initial_data,
+            "overriden_data": [],
+            "image_links": image_links,
+        }
 
         self.catalog_lots[catalog_id].append(lot)
 
-    def build(self) -> BulkInsertRequest:
-        """Build final BulkInsertRequest."""
+    def build(self) -> dict:
+        """Build final bulk insert request dict."""
         catalogs = []
 
         for catalog_id, cat_data in self.catalogs_data.items():
-            sellers = [
-                BulkInsertSellerRequest(**s)
-                for s in self.catalog_sellers[catalog_id].values()
-            ]
+            sellers = list(self.catalog_sellers[catalog_id].values())
 
-            catalog = BulkInsertCatalogRequest(
-                customer_catalog_id=cat_data["customer_catalog_id"],
-                title=cat_data["title"],
-                start_date=cat_data["start_date"],
-                end_date=cat_data["end_date"],
-                agent=cat_data["agent"],
-                sellers=sellers,
-                lots=self.catalog_lots[catalog_id],
-            )
+            catalog = {
+                "customer_catalog_id": cat_data["customer_catalog_id"],
+                "title": cat_data["title"],
+                "start_date": cat_data["start_date"],
+                "end_date": cat_data["end_date"],
+                "agent": cat_data["agent"],
+                "sellers": sellers,
+                "lots": self.catalog_lots[catalog_id],
+            }
             catalogs.append(catalog)
 
-        return BulkInsertRequest(catalogs=catalogs)
+        return {"catalogs": catalogs}
 
     def summary(self) -> str:
         """Return summary of built data."""
@@ -236,18 +260,18 @@ class CatalogDataBuilder:
 # =============================================================================
 
 
-def load_file(path: str | Path, agent: str = DEFAULT_AGENT) -> tuple[BulkInsertRequest, str]:
-    """Load a spreadsheet and return (BulkInsertRequest, summary_string).
+def load_file(path: str | Path, agent: str = DEFAULT_AGENT) -> tuple[dict, str]:
+    """Load a spreadsheet and return (bulk_insert_dict, summary_string).
 
     Args:
         path: Path to spreadsheet (xlsx, csv, json)
         agent: Default agent code for catalogs
 
     Returns:
-        Tuple of (BulkInsertRequest, human-readable summary)
+        Tuple of (bulk insert dict, human-readable summary)
     """
     path = Path(path)
-    data = FileLoader(path.as_posix()).data
+    data = _load_data(path)
 
     builder = CatalogDataBuilder(agent=agent)
     for row in data:

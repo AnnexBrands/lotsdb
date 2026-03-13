@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 
 # Shared test constants — derived from spec examples and data-model.md payloads.
 AUTH_SESSION = {
-    "abc_token": {"access_token": "test", "expires_at": 9999999999},
+    "ab_token": {"access_token": "test", "expires_at": 9999999999},
     "abc_username": "test@example.com",
 }
 

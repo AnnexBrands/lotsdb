@@ -1,4 +1,3 @@
-from ABConnect.api.models.catalog import AddLotRequest
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -53,7 +52,7 @@ def recovery_retry(request, customer_item_id):
 
     # Retry create
     try:
-        add_req = AddLotRequest.model_validate(entry["add_lot_request"])
+        add_req = entry["add_lot_request"]
         services.create_lot(request, add_req)
         services.remove_recovery_entry(request, customer_item_id)
         remaining = services.get_recovery_entries(request)

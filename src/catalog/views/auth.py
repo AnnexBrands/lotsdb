@@ -4,7 +4,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.urls import reverse
 
-from ABConnect.exceptions import LoginFailedError, ABConnectError
+from ab.exceptions import AuthenticationError, ABConnectError
 from catalog import services
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ def login_view(request):
         try:
             services.login(request, username, password)
             return HttpResponseRedirect(reverse("home"))
-        except LoginFailedError:
+        except AuthenticationError:
             logger.warning("Login failed for user %s: invalid credentials", username)
             return render(
                 request,

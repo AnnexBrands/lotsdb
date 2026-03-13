@@ -33,23 +33,25 @@ def _make_server_lot(lot_id, customer_item_id, initial_data, overriden_data=None
 
 
 def _make_file_lot(customer_item_id, initial_data, lot_number="1", image_links=None):
-    """Build a SimpleNamespace mimicking BulkInsertLotRequest from file."""
-    return SimpleNamespace(
-        customer_item_id=customer_item_id,
-        lot_number=lot_number,
-        image_links=image_links or [],
-        initial_data=initial_data,
-        overriden_data=[initial_data],
-    )
+    """Build a dict mimicking a file lot from CatalogDataBuilder."""
+    data_dict = {k: v for k, v in vars(initial_data).items() if v is not None}
+    return {
+        "customer_item_id": customer_item_id,
+        "lot_number": lot_number,
+        "image_links": image_links or [],
+        "initial_data": data_dict,
+        "overriden_data": [],
+    }
 
 
 def _make_bulk_request(file_lots, customer_catalog_id="CAT-001"):
-    """Build a SimpleNamespace mimicking BulkInsertRequest."""
-    catalog = SimpleNamespace(
-        customer_catalog_id=customer_catalog_id,
-        lots=file_lots,
-    )
-    return SimpleNamespace(catalogs=[catalog])
+    """Build a dict mimicking a bulk insert request."""
+    return {
+        "catalogs": [{
+            "customer_catalog_id": customer_catalog_id,
+            "lots": file_lots,
+        }],
+    }
 
 
 class TestLotsDiffer:
@@ -90,12 +92,13 @@ class TestLotsDiffer:
 
 
 class TestMergeCatalog:
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot")
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots", return_value=[])
-    def test_all_new_lots(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_all_new_lots(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """When server has no lots, all file lots are added."""
         request = SimpleNamespace(session={"abc_username": "test"})
         data = _make_lot_data(qty=1, l=10.0, w=5.0, h=3.0, wgt=2.0, cpack="3", force_crate=False)
@@ -115,12 +118,13 @@ class TestMergeCatalog:
         assert mock_create.call_count == 3
         mock_delete.assert_not_called()
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot")
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots")
-    def test_all_unchanged(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_all_unchanged(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """When all lots have identical data, nothing is modified."""
         request = SimpleNamespace(session={"abc_username": "test"})
         data = _make_lot_data(qty=1, l=10.0, w=5.0, h=3.0, wgt=2.0, cpack="3", force_crate=False)
@@ -145,12 +149,13 @@ class TestMergeCatalog:
         mock_create.assert_not_called()
         mock_delete.assert_not_called()
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot")
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots")
-    def test_mixed_scenario(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_mixed_scenario(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """1 new, 1 changed, 1 unchanged."""
         request = SimpleNamespace(session={"abc_username": "test"})
         same_data = _make_lot_data(qty=1, l=10.0, w=5.0, h=3.0, wgt=2.0, cpack="3")
@@ -179,12 +184,13 @@ class TestMergeCatalog:
         mock_delete.assert_called_once_with(request, 2)
         assert mock_create.call_count == 2
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot")
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots")
-    def test_override_preservation(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_override_preservation(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """Changed lot preserves existing overrides from server."""
         request = SimpleNamespace(session={"abc_username": "test"})
         server_data = _make_lot_data(qty=1, l=10.0)
@@ -200,20 +206,21 @@ class TestMergeCatalog:
         result = merge_catalog(request, bulk, catalog_id=42)
 
         assert result["updated"] == 1
-        # Verify the create call included the saved override
+        # Verify the create call included the saved override (now as dict)
         create_call = mock_create.call_args
         add_req = create_call[0][1]
-        assert len(add_req.overriden_data) == 1
-        assert add_req.overriden_data[0].qty == 5
-        assert add_req.overriden_data[0].l == 12.0
-        assert add_req.overriden_data[0].w == 6.0
+        assert len(add_req["overridenData"]) == 1
+        assert add_req["overridenData"][0]["qty"] == 5
+        assert add_req["overridenData"][0]["l"] == 12.0
+        assert add_req["overridenData"][0]["w"] == 6.0
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot", side_effect=[Exception("server error"), None])
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots", return_value=[])
-    def test_best_effort_failure(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_best_effort_failure(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """When one lot fails, others continue. Failed count incremented."""
         request = SimpleNamespace(session={"abc_username": "test"})
         data = _make_lot_data(qty=1)
@@ -235,12 +242,13 @@ class TestMergeCatalog:
         assert cached_entry["customer_item_id"] == "FAIL"
         assert cached_entry["operation"] == "create"
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot", side_effect=Exception("total failure"))
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots", return_value=[])
-    def test_100pct_failure_reraise(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_100pct_failure_reraise(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """When ALL lots fail, merge_catalog raises RuntimeError."""
         request = SimpleNamespace(session={"abc_username": "test"})
         data = _make_lot_data(qty=1)
@@ -250,12 +258,13 @@ class TestMergeCatalog:
         with pytest.raises(RuntimeError, match="All 2 lots failed"):
             merge_catalog(request, bulk, catalog_id=42)
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot")
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots", return_value=[])
-    def test_duplicate_customer_item_id_dedup(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_duplicate_customer_item_id_dedup(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """Duplicate customer_item_id in file: only first occurrence processed."""
         request = SimpleNamespace(session={"abc_username": "test"})
         data1 = _make_lot_data(qty=1)
@@ -271,14 +280,15 @@ class TestMergeCatalog:
         assert result["added"] == 1
         mock_create.assert_called_once()
         add_req = mock_create.call_args[0][1]
-        assert add_req.initial_data.qty == 1
+        assert add_req["initialData"]["qty"] == 1
 
+    @patch("catalog.services.scan_lot_images", return_value=[])
     @patch("catalog.services.cache_recovery_entry")
     @patch("catalog.services.get_catalog", return_value=_mock_catalog_obj())
     @patch("catalog.services.create_lot")
     @patch("catalog.services.delete_lot")
     @patch("catalog.services.fetch_all_lots", return_value=[])
-    def test_merge_returns_seller_and_catalog_ids(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, db):
+    def test_merge_returns_seller_and_catalog_ids(self, mock_fetch, mock_delete, mock_create, mock_get_cat, mock_cache, mock_scan, db):
         """Merge result includes seller_display_id and customer_catalog_id for redirect."""
         request = SimpleNamespace(session={"abc_username": "test"})
         data = _make_lot_data(qty=1)

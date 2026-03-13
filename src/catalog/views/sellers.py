@@ -2,7 +2,7 @@ import logging
 
 from django.shortcuts import render
 
-from ABConnect.exceptions import ABConnectError
+from ab.exceptions import ABConnectError
 from catalog import services
 from catalog.views.panels import build_lot_table_rows
 
